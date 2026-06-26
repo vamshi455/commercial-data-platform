@@ -1,0 +1,31 @@
+# =============================================================================
+# resources/crm_ingestion.pipeline.yml
+# -----------------------------------------------------------------------------
+# Lakeflow Declarative (DLT) pipeline that ingests CRM source files from the
+# landing volume into the bronze schema using Auto Loader.
+# =============================================================================
+resources:
+  pipelines:
+    crm_ingestion:
+      name: "[${bundle.target}] cdp_crm_ingestion"
+      catalog: ${var.catalog}
+      schema: bronze            # target schema for materialized bronze tables
+      serverless: true
+      channel: ${var.pipeline_channel}
+      development: false
+      continuous: false
+      photon: true
+      libraries:
+        - file:
+            path: ../src/pipelines/ingestion/crm_autoloader.py
+      configuration:
+        cdp.catalog: ${var.catalog}
+        cdp.landing_path: ${var.landing_volume}
+        cdp.source_system: crm
+        cdp.target_schema: bronze
+      notifications:
+        - email_recipients:
+            - ${var.notifications_email}
+          alerts:
+            - on-update-failure
+            - on-flow-failure

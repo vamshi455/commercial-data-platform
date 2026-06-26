@@ -1,0 +1,55 @@
+# =============================================================================
+# resources/orchestration.job.yml
+# -----------------------------------------------------------------------------
+# Daily orchestration Workflow: ingest CRM + ERP into bronze, then run the
+# silver/gold transformation pipeline. Pipeline tasks reference the pipeline
+# resources by id so the bundle wires DAG dependencies across files.
+#
+# In dev (mode: development) the bundle automatically PAUSES the schedule, so
+# the QUARTZ_CRON below only fires in qa/prod.
+# =============================================================================
+resources:
+  jobs:
+    job_orchestration_daily:
+      name: "[${bundle.target}] job_orchestration_daily"
+
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: orchestration
+
+      schedule:
+        quartz_cron_expression: "0 0 5 * * ?"   # 05:00 daily
+        timezone_id: America/New_York
+        pause_status: UNPAUSED                   # dev mode overrides this to PAUSED
+
+      email_notifications:
+        on_failure:
+          - ${var.notifications_email}
+        no_alert_for_skipped_runs: true
+
+      tasks:
+        # 1) CRM ingestion -> bronze
+        - task_key: crm_ingestion
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.crm_ingestion.id}
+            full_refresh: false
+
+        # 2) ERP + reference ingestion -> bronze (after CRM)
+        - task_key: erp_ingestion
+          depends_on:
+            - task_key: crm_ingestion
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.erp_ingestion.id}
+            full_refresh: false
+
+        # 3) Silver + gold transformation (after both ingests)
+        - task_key: transformation
+          depends_on:
+            - task_key: erp_ingestion
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.transformation.id}
+            full_refresh: false
+
+      queue:
+        enabled: true

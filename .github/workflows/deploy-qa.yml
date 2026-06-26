@@ -1,0 +1,44 @@
+# =============================================================================
+# Deploy to QA — runs on push to `develop` and `release/**`.
+# Uses the QA service principal credentials, sourced from the GitHub
+# Environment "qa" (configure secrets there, not at repo level).
+# Auth: OAuth M2M — CLI reads DATABRICKS_HOST/CLIENT_ID/CLIENT_SECRET from env.
+# =============================================================================
+name: deploy-qa
+
+on:
+  push:
+    branches:
+      - develop
+      - "release/**"
+  workflow_dispatch: {}
+
+# Never run two QA deploys at once; let the latest finish.
+concurrency:
+  group: deploy-qa
+  cancel-in-progress: false
+
+jobs:
+  deploy-qa:
+    runs-on: ubuntu-latest
+    # Scopes the job to the "qa" GitHub Environment so it pulls QA secrets
+    # (and any protection rules) defined there.
+    environment: qa
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+          databricks version
+
+      - name: Validate bundle (qa)
+        run: databricks bundle validate -t qa
+
+      - name: Deploy bundle (qa)
+        run: databricks bundle deploy -t qa

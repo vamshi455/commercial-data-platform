@@ -1,0 +1,31 @@
+# Databricks Asset Bundles
+.databricks/
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Synthetic data output (generated locally, never commit)
+data_gen/output/
+*.parquet
+*.csv.gz
+landing/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Secrets — never commit tokens
+*.pem
+*.token
+secrets.json

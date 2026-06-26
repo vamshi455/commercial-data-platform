@@ -1,0 +1,67 @@
+# =============================================================================
+# CI — runs on every pull request. Validates the Databricks Asset Bundle and
+# runs Python syntax checks + unit tests. NO deploy happens here.
+# Auth: OAuth machine-to-machine (M2M) via a service principal. The Databricks
+# CLI auto-detects DATABRICKS_HOST + DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET.
+# =============================================================================
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - "release/**"
+      - main
+  workflow_dispatch: {}
+
+# Cancel superseded runs on the same PR to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+    # Repo-level secrets are fine for validate (read-only, dev target).
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml
+
+      - name: Install Databricks CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+          databricks version
+
+      - name: Python syntax check (compile all .py)
+        run: |
+          python -m compileall -q data_gen src agents tests scripts || true
+          python - <<'PY'
+          import ast, glob
+          files = (glob.glob("agents/**/*.py", recursive=True)
+                   + glob.glob("tests/**/*.py", recursive=True)
+                   + glob.glob("data_gen/**/*.py", recursive=True)
+                   + glob.glob("src/**/*.py", recursive=True))
+          for f in files:
+              ast.parse(open(f).read(), filename=f)
+          print(f"syntax ok: {len(files)} files")
+          PY
+
+      - name: Databricks bundle validate (dev)
+        run: databricks bundle validate -t dev
+
+      - name: Run unit tests
+        run: pytest -q tests/

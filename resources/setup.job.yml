@@ -1,0 +1,60 @@
+# =============================================================================
+# resources/setup.job.yml
+# -----------------------------------------------------------------------------
+# Platform-setup Workflow: runs the governance SQL notebooks (notebooks/setup/*)
+# to create catalogs/schemas/volumes, apply persona grants, and bind masking,
+# row filters, and tags for the target environment.
+#
+# Run on demand after deploy:
+#   databricks bundle run job_platform_setup -t dev
+# In qa/prod this runs as the deploy service principal, which must hold the
+# required UC privileges (metastore-admin / catalog owner) — see governance/README.md.
+# =============================================================================
+resources:
+  jobs:
+    job_platform_setup:
+      name: "[${bundle.target}] job_platform_setup"
+
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: governance
+
+      email_notifications:
+        on_failure:
+          - ${var.notifications_email}
+
+      # Serverless SQL-notebook tasks; the catalog widget is passed per task.
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+
+      tasks:
+        # 1) Catalog, schemas, landing volume
+        - task_key: create_catalogs_schemas
+          notebook_task:
+            notebook_path: ../notebooks/setup/00_create_catalogs_schemas.sql
+            base_parameters:
+              catalog: ${var.catalog}
+              env: ${bundle.target}
+
+        # 2) Persona RBAC grants
+        - task_key: grants_personas
+          depends_on:
+            - task_key: create_catalogs_schemas
+          notebook_task:
+            notebook_path: ../notebooks/setup/01_grants_personas.sql
+            base_parameters:
+              catalog: ${var.catalog}
+
+        # 3) Masking + row filters + tags (run after tables exist)
+        - task_key: masking_row_filters
+          depends_on:
+            - task_key: grants_personas
+          notebook_task:
+            notebook_path: ../notebooks/setup/02_masking_row_filters.sql
+            base_parameters:
+              catalog: ${var.catalog}
+
+      queue:
+        enabled: true

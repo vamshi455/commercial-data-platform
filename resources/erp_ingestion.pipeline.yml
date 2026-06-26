@@ -1,0 +1,33 @@
+# =============================================================================
+# resources/erp_ingestion.pipeline.yml
+# -----------------------------------------------------------------------------
+# Lakeflow Declarative (DLT) pipeline that ingests ERP transactional files and
+# reference/lookup data from the landing volume into the bronze schema.
+# =============================================================================
+resources:
+  pipelines:
+    erp_ingestion:
+      name: "[${bundle.target}] cdp_erp_ingestion"
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      channel: ${var.pipeline_channel}
+      development: false
+      continuous: false
+      photon: true
+      libraries:
+        - file:
+            path: ../src/pipelines/ingestion/erp_autoloader.py
+        - file:
+            path: ../src/pipelines/ingestion/reference_autoloader.py
+      configuration:
+        cdp.catalog: ${var.catalog}
+        cdp.landing_path: ${var.landing_volume}
+        cdp.source_system: erp
+        cdp.target_schema: bronze
+      notifications:
+        - email_recipients:
+            - ${var.notifications_email}
+          alerts:
+            - on-update-failure
+            - on-flow-failure

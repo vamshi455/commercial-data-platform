@@ -1,0 +1,36 @@
+# =============================================================================
+# resources/transformation.pipeline.yml
+# -----------------------------------------------------------------------------
+# Lakeflow Declarative (DLT) pipeline that builds the silver (conformed) and
+# gold (serving marts) layers. Includes all modules under src/pipelines/silver
+# and src/pipelines/gold. Target schema is controlled per-flow via the
+# schema/database hints set in the notebooks (LIVE schema = silver/gold).
+# =============================================================================
+resources:
+  pipelines:
+    transformation:
+      name: "[${bundle.target}] cdp_transformation"
+      catalog: ${var.catalog}
+      schema: gold              # default publish schema; silver flows publish to silver
+      serverless: true
+      channel: ${var.pipeline_channel}
+      development: false
+      continuous: false
+      photon: true
+      libraries:
+        # Silver — cleansed, conformed entities
+        - glob:
+            include: ../src/pipelines/silver/**
+        # Gold — curated serving marts
+        - glob:
+            include: ../src/pipelines/gold/**
+      configuration:
+        cdp.catalog: ${var.catalog}
+        cdp.silver_schema: silver
+        cdp.gold_schema: gold
+      notifications:
+        - email_recipients:
+            - ${var.notifications_email}
+          alerts:
+            - on-update-failure
+            - on-flow-failure

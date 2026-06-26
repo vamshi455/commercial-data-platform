@@ -1,0 +1,53 @@
+# =============================================================================
+# Deploy to PROD — runs on a version tag push (`v*`) or push to `main`.
+# Uses the PROD service principal credentials from the GitHub Environment "prod".
+#
+# APPROVAL GATE
+# -------------
+# The `environment: prod` line below is what enforces manual approval. In
+# GitHub -> Settings -> Environments -> "prod", configure:
+#   * Required reviewers  -> the run pauses here until a named reviewer approves.
+#   * (optional) Wait timer / deployment branch rules (e.g. only tags + main).
+# Until a reviewer clicks "Approve", the job stays in a "Waiting" state and
+# NOTHING is deployed to production. PROD secrets are scoped to this Environment
+# and are not readable by jobs that don't target it.
+# =============================================================================
+name: deploy-prod
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+  workflow_dispatch: {}
+
+# Serialize prod deploys; do not cancel an in-flight production rollout.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    # <-- This binds the job to the "prod" Environment and triggers the
+    #     required-reviewers approval gate before any step runs.
+    environment: prod
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+          databricks version
+
+      - name: Validate bundle (prod)
+        run: databricks bundle validate -t prod
+
+      - name: Deploy bundle (prod)
+        run: databricks bundle deploy -t prod

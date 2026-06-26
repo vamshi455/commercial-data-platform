@@ -1,0 +1,92 @@
+# =============================================================================
+# Commercial Data Platform — Databricks Asset Bundle (DAB) root config
+# -----------------------------------------------------------------------------
+# One bundle, three promotable targets: dev -> qa -> prod.
+# Each target maps to its own Unity Catalog (cdp_dev / cdp_qa / cdp_prod) and
+# its own workspace path, so the SAME code is deployed everywhere and only the
+# config (catalog, schedule, permissions, compute) changes per environment.
+#
+# Deploy:   databricks bundle deploy   -t dev
+# Run:      databricks bundle run job_orchestration_daily -t dev
+# Validate: databricks bundle validate -t qa
+# =============================================================================
+
+bundle:
+  name: commercial-data-platform
+
+# Shared variables — overridden per target below.
+variables:
+  catalog:
+    description: Unity Catalog this environment writes to.
+    default: cdp_dev
+  landing_volume:
+    description: UC Volume path where synthetic source files land.
+    default: /Volumes/cdp_dev/landing/files
+  notifications_email:
+    description: Where job-failure alerts are sent.
+    default: vamshi455@gmail.com
+  pipeline_channel:
+    description: DLT / Lakeflow runtime channel (CURRENT or PREVIEW).
+    default: CURRENT
+  deploy_service_principal:
+    description: >-
+      Service principal application ID used to run QA/PROD jobs and pipelines.
+      Set per-target in CI via --var or DATABRICKS_BUNDLE_VAR_deploy_service_principal.
+    default: ""
+
+# Resource definitions (jobs + pipelines) live in resources/*.yml and are
+# included here so they can reference ${var.*} and ${bundle.target}.
+include:
+  - resources/*.yml
+
+# -----------------------------------------------------------------------------
+# Targets / environments
+# -----------------------------------------------------------------------------
+targets:
+
+  # ---- DEV: developer iteration, synthetic refreshes, isolated per-user ----
+  dev:
+    mode: development          # prefixes resources with [dev <user>], pauses schedules
+    default: true
+    workspace:
+      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/dev
+    variables:
+      catalog: cdp_dev
+      landing_volume: /Volumes/cdp_dev/landing/files
+      pipeline_channel: PREVIEW
+
+  # ---- QA: validation, integration tests, UAT. Shared, scheduled paused. ----
+  qa:
+    mode: production
+    workspace:
+      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      root_path: /Workspace/.bundle/${bundle.name}/qa
+    variables:
+      catalog: cdp_qa
+      landing_volume: /Volumes/cdp_qa/landing/files
+      pipeline_channel: CURRENT
+    # Service principal recommended for QA/PROD (set in CI secrets, not here).
+    run_as:
+      service_principal_name: ${var.deploy_service_principal}
+    permissions:
+      - level: CAN_VIEW
+        group_name: cdp_analytics_engineers
+
+  # ---- PROD: controlled execution, restricted access, real schedules ----
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      root_path: /Workspace/.bundle/${bundle.name}/prod
+    variables:
+      catalog: cdp_prod
+      landing_volume: /Volumes/cdp_prod/landing/files
+      pipeline_channel: CURRENT
+    run_as:
+      service_principal_name: ${var.deploy_service_principal}
+    permissions:
+      - level: CAN_MANAGE
+        group_name: cdp_platform_engineers
+      - level: CAN_VIEW
+        group_name: cdp_data_stewards

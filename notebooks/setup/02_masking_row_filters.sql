@@ -1,0 +1,171 @@
+-- Databricks notebook source
+-- MAGIC %md
+-- MAGIC # 02 — Masking, Row Filters & Classification Tags
+-- MAGIC Wraps `governance/masking_functions.sql`, `governance/row_filters.sql`,
+-- MAGIC and `governance/tags_classification.sql`. Creates the masking + row-filter
+-- MAGIC UDFs, binds them to silver/gold columns, and applies the `sensitivity` tag
+-- MAGIC taxonomy.
+-- MAGIC
+-- MAGIC **Run after the first pipeline run** so the silver/gold tables that get
+-- MAGIC `SET MASK` / `SET ROW FILTER` / `SET TAGS` exist.
+
+-- COMMAND ----------
+
+CREATE WIDGET TEXT catalog DEFAULT 'cdp_dev';
+USE CATALOG IDENTIFIER(:catalog);
+USE SCHEMA gold;
+
+-- COMMAND ----------
+
+-- MAGIC %md ## Masking UDFs
+
+-- COMMAND ----------
+
+-- DBTITLE 1,mask_email
+CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
+  RETURNS STRING
+  COMMENT 'Column mask: redacts the local part of an email unless caller is a privileged group.'
+  RETURN
+    CASE
+      WHEN is_account_group_member('cdp_data_stewards')
+        OR is_account_group_member('cdp_platform_engineers')
+        OR is_account_group_member('cdp_customer_success')
+      THEN email
+      WHEN email IS NULL OR instr(email, '@') = 0 THEN '****'
+      ELSE concat('****@', split_part(email, '@', 2))
+    END;
+
+-- COMMAND ----------
+
+-- DBTITLE 1,mask_phone
+CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
+  RETURNS STRING
+  COMMENT 'Column mask: shows only the last 4 digits of a phone number for non-privileged callers.'
+  RETURN
+    CASE
+      WHEN is_account_group_member('cdp_data_stewards')
+        OR is_account_group_member('cdp_platform_engineers')
+        OR is_account_group_member('cdp_customer_success')
+      THEN phone
+      WHEN phone IS NULL OR length(regexp_replace(phone, '[^0-9]', '')) < 4 THEN '***-****'
+      ELSE concat('***-***-', right(regexp_replace(phone, '[^0-9]', ''), 4))
+    END;
+
+-- COMMAND ----------
+
+-- DBTITLE 1,mask_tax_id
+CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
+  RETURNS STRING
+  COMMENT 'Column mask: financial_sensitive — shows last 4 of a tax/EIN/SSN; full for finance & stewards.'
+  RETURN
+    CASE
+      WHEN is_account_group_member('cdp_data_stewards')
+        OR is_account_group_member('cdp_platform_engineers')
+        OR is_account_group_member('cdp_finance_analysts')
+      THEN tax_id
+      WHEN tax_id IS NULL OR length(tax_id) < 4 THEN '****'
+      ELSE concat('***-**-', right(tax_id, 4))
+    END;
+
+-- COMMAND ----------
+
+-- DBTITLE 1,mask_free_text
+CREATE OR REPLACE FUNCTION gold.mask_free_text(txt STRING)
+  RETURNS STRING
+  COMMENT 'Column mask: restricted_free_text — redacts unstructured notes unless caller is a steward/platform.'
+  RETURN
+    CASE
+      WHEN is_account_group_member('cdp_data_stewards')
+        OR is_account_group_member('cdp_platform_engineers')
+      THEN txt
+      WHEN txt IS NULL THEN NULL
+      ELSE '[REDACTED]'
+    END;
+
+-- COMMAND ----------
+
+-- MAGIC %md ## Bind column masks (silver + gold)
+
+-- COMMAND ----------
+
+ALTER TABLE silver.crm_contacts  ALTER COLUMN email    SET MASK gold.mask_email;
+ALTER TABLE silver.crm_contacts  ALTER COLUMN phone    SET MASK gold.mask_phone;
+ALTER TABLE silver.crm_accounts  ALTER COLUMN tax_id   SET MASK gold.mask_tax_id;
+ALTER TABLE silver.erp_invoices  ALTER COLUMN tax_id   SET MASK gold.mask_tax_id;
+
+ALTER TABLE gold.customer_360 ALTER COLUMN primary_email SET MASK gold.mask_email;
+ALTER TABLE gold.customer_360 ALTER COLUMN primary_phone SET MASK gold.mask_phone;
+ALTER TABLE gold.customer_360 ALTER COLUMN tax_id        SET MASK gold.mask_tax_id;
+ALTER TABLE gold.support_performance ALTER COLUMN last_case_notes SET MASK gold.mask_free_text;
+ALTER TABLE gold.account_health      ALTER COLUMN steward_notes   SET MASK gold.mask_free_text;
+
+-- COMMAND ----------
+
+-- MAGIC %md ## Row filter — territory_filter
+
+-- COMMAND ----------
+
+CREATE OR REPLACE FUNCTION gold.territory_filter(territory STRING)
+  RETURNS BOOLEAN
+  COMMENT 'Row filter: unrestricted for finance/stewards/platform; sales_analysts see only mapped territories.'
+  RETURN
+    is_account_group_member('cdp_data_stewards')
+    OR is_account_group_member('cdp_platform_engineers')
+    OR is_account_group_member('cdp_finance_analysts')
+    OR is_account_group_member('cdp_analytics_engineers')
+    OR (
+      is_account_group_member('cdp_sales_analysts')
+      AND territory IN (
+        SELECT m.territory FROM ops.user_territory_map m
+        WHERE m.user_email = current_user()
+      )
+    );
+
+-- COMMAND ----------
+
+ALTER TABLE gold.revenue_pipeline SET ROW FILTER gold.territory_filter ON (territory);
+ALTER TABLE gold.customer_360     SET ROW FILTER gold.territory_filter ON (territory);
+ALTER TABLE gold.account_health   SET ROW FILTER gold.territory_filter ON (territory);
+ALTER TABLE gold.renewal_risk     SET ROW FILTER gold.territory_filter ON (territory);
+
+-- COMMAND ----------
+
+-- MAGIC %md ## Classification tags (sensitivity taxonomy)
+
+-- COMMAND ----------
+
+-- DBTITLE 1,Bronze
+ALTER TABLE bronze.crm_accounts SET TAGS ('sensitivity' = 'internal_only', 'layer' = 'bronze', 'domain' = 'crm');
+ALTER TABLE bronze.crm_contacts SET TAGS ('sensitivity' = 'pii',           'layer' = 'bronze', 'domain' = 'crm');
+ALTER TABLE bronze.erp_invoices SET TAGS ('sensitivity' = 'financial_sensitive', 'layer' = 'bronze', 'domain' = 'erp');
+ALTER TABLE bronze.erp_payments SET TAGS ('sensitivity' = 'financial_sensitive', 'layer' = 'bronze', 'domain' = 'erp');
+ALTER TABLE bronze.crm_contacts ALTER COLUMN email  SET TAGS ('sensitivity' = 'pii');
+ALTER TABLE bronze.crm_contacts ALTER COLUMN phone  SET TAGS ('sensitivity' = 'pii');
+ALTER TABLE bronze.crm_accounts ALTER COLUMN tax_id SET TAGS ('sensitivity' = 'financial_sensitive');
+ALTER TABLE bronze.erp_invoices ALTER COLUMN tax_id SET TAGS ('sensitivity' = 'financial_sensitive');
+ALTER TABLE bronze.ref_currency_rates SET TAGS ('sensitivity' = 'public_reference', 'layer' = 'bronze', 'domain' = 'reference');
+ALTER TABLE bronze.ref_country_codes  SET TAGS ('sensitivity' = 'public_reference', 'layer' = 'bronze', 'domain' = 'reference');
+
+-- COMMAND ----------
+
+-- DBTITLE 1,Silver
+ALTER TABLE silver.crm_contacts ALTER COLUMN email  SET TAGS ('sensitivity' = 'pii');
+ALTER TABLE silver.crm_contacts ALTER COLUMN phone  SET TAGS ('sensitivity' = 'pii');
+ALTER TABLE silver.crm_accounts ALTER COLUMN tax_id SET TAGS ('sensitivity' = 'financial_sensitive');
+ALTER TABLE silver.erp_invoices ALTER COLUMN tax_id SET TAGS ('sensitivity' = 'financial_sensitive');
+
+-- COMMAND ----------
+
+-- DBTITLE 1,Gold
+ALTER TABLE gold.customer_360         SET TAGS ('sensitivity' = 'pii',                 'layer' = 'gold');
+ALTER TABLE gold.revenue_pipeline     SET TAGS ('sensitivity' = 'internal_only',       'layer' = 'gold');
+ALTER TABLE gold.bookings_vs_billings SET TAGS ('sensitivity' = 'financial_sensitive', 'layer' = 'gold');
+ALTER TABLE gold.collections_risk     SET TAGS ('sensitivity' = 'financial_sensitive', 'layer' = 'gold');
+ALTER TABLE gold.support_performance  SET TAGS ('sensitivity' = 'restricted_free_text', 'layer' = 'gold');
+ALTER TABLE gold.account_health       SET TAGS ('sensitivity' = 'internal_only',       'layer' = 'gold');
+ALTER TABLE gold.renewal_risk         SET TAGS ('sensitivity' = 'internal_only',       'layer' = 'gold');
+ALTER TABLE gold.customer_360         ALTER COLUMN primary_email   SET TAGS ('sensitivity' = 'pii');
+ALTER TABLE gold.customer_360         ALTER COLUMN primary_phone   SET TAGS ('sensitivity' = 'pii');
+ALTER TABLE gold.customer_360         ALTER COLUMN tax_id          SET TAGS ('sensitivity' = 'financial_sensitive');
+ALTER TABLE gold.support_performance  ALTER COLUMN last_case_notes SET TAGS ('sensitivity' = 'restricted_free_text');
+ALTER TABLE gold.account_health       ALTER COLUMN steward_notes   SET TAGS ('sensitivity' = 'restricted_free_text');
