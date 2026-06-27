@@ -5,7 +5,7 @@ A phased plan to build the Commercial Data Platform: a Salesforce-like **CRM** +
 governance, and AI agents. Each phase lists **goals**, **deliverables**, **acceptance
 criteria**, and the **repo files/folders** that implement it.
 
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` · **Catalogs:**
+> **Workspace:** `https://adb-1234567890123456.7.azuredatabricks.net` · **Catalogs:**
 > `cdp_dev / cdp_qa / cdp_prod` · **Schemas:** `landing, bronze, silver, gold, ops` (+
 > `sandbox` in dev).
 
@@ -104,7 +104,7 @@ criteria**, and the **repo files/folders** that implement it.
 | **Unity Catalog governance** | `databricks.yml` permissions, `governance/` masks/grants, system-table lineage |
 | **Batch + streaming ingestion** | Auto Loader streaming tables (`src/pipelines/ingestion/`), reference batch MVs |
 | **Performance tuning** | `cloudFiles.maxFilesPerTrigger`, partitioning/Z-order/clustering, channel choice, full-refresh-select |
-| **Cloud awareness (AWS)** | AWS Databricks workspace, UC Volumes on S3, OAuth M2M, system.billing usage |
+| **Cloud awareness (Azure)** | Azure Databricks workspace, UC Volumes on ADLS Gen2, Access Connector (managed identity), Key Vault-backed secret scopes, OAuth M2M, system.billing usage |
 | **DQ / reconciliation** | DLT expectations catalog, invoice/payment recon, `ops.dq_results`, `tests/dq` |
 | **GenAI** | `agents/*`, Genie/Mosaic AI, governed SQL function-calling, MLflow serving (optional) |
 | **CRM/ERP integration** | identity resolution CRM accounts ↔ ERP customers, bookings vs billings |

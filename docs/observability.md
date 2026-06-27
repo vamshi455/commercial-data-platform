@@ -1,7 +1,7 @@
 # Observability — Lineage, Freshness, Data Quality, SLA & Run-Health
 
 > **Program:** Commercial Data Platform (CDP)
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+> **Workspace:** `https://adb-1234567890123456.7.azuredatabricks.net` (Azure Databricks)
 > **Goal:** a single **control plane** that answers, at any moment: *Is the data
 > fresh? Is it correct? Did the pipelines run? What breaks if I change X?*
 >

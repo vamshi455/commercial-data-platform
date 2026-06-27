@@ -31,7 +31,7 @@ All workflows authenticate with a Databricks **service principal** using OAuth
 machine-to-machine (M2M). The Databricks CLI auto-detects these env vars, which
 the workflows wire from secrets:
 
-- `DATABRICKS_HOST` — `https://dbc-0d3c2f0f-de7b.cloud.databricks.com`
+- `DATABRICKS_HOST` — `https://adb-1234567890123456.7.azuredatabricks.net`
 - `DATABRICKS_CLIENT_ID` — the service principal's OAuth client (application) id
 - `DATABRICKS_CLIENT_SECRET` — an OAuth secret for that service principal
 

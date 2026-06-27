@@ -1,7 +1,7 @@
 # Environments — dev / qa / prod
 
 > **Program:** Commercial Data Platform (CDP)
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+> **Workspace:** `https://adb-1234567890123456.7.azuredatabricks.net` (Azure Databricks)
 > **Deployment:** Databricks Asset Bundles (DAB), one bundle, three targets.
 >
 > This document explains the three-environment model, how a single codebase is
@@ -114,7 +114,7 @@ targets:
     mode: development            # [dev <user>] prefixes, paused schedules, per-user isolation
     default: true
     workspace:
-      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      host: https://adb-1234567890123456.7.azuredatabricks.net
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/dev
     variables:
       catalog: cdp_dev
@@ -124,7 +124,7 @@ targets:
   qa:
     mode: production
     workspace:
-      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      host: https://adb-1234567890123456.7.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/qa
     variables:
       catalog: cdp_qa
@@ -135,7 +135,7 @@ targets:
   prod:
     mode: production
     workspace:
-      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      host: https://adb-1234567890123456.7.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/prod
     variables:
       catalog: cdp_prod
@@ -259,7 +259,7 @@ synthetic noise (or worse, leak prod data downward).
 
 ### Secrets
 
-- Stored in **Databricks secret scopes** (or backed by AWS Secrets Manager), one
+- Stored in **Databricks secret scopes** (or backed by **Azure Key Vault**), one
   scope per environment (e.g. `cdp_dev`, `cdp_qa`, `cdp_prod`).
 - Referenced as `${secrets/<scope>/<key>}` or `dbutils.secrets.get(...)`; never
   hard-coded. The deploy service-principal name and source credentials are

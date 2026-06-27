@@ -7,9 +7,11 @@ It is built to look and operate like a real enterprise commercial data platform 
 lab — using the current Databricks stack: **Unity Catalog** governance, **Lakeflow / DLT
 declarative pipelines**, **Auto Loader** ingestion, a **medallion (bronze→silver→gold)**
 architecture, a **Delta + selective Managed Iceberg** table strategy, automatic **lineage**, and
-**Databricks Asset Bundles** for `dev → qa → prod` CI/CD.
+**Databricks Asset Bundles** for `dev → qa → prod` CI/CD. It runs on **Azure Databricks**, with
+landing **UC Volumes** on **ADLS Gen2** governed via an **Azure Databricks Access Connector**
+(managed identity).
 
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+> **Workspace:** `https://adb-1234567890123456.7.azuredatabricks.net` (Azure Databricks)
 > **Catalogs:** `cdp_dev`, `cdp_qa`, `cdp_prod`
 
 ---
@@ -85,7 +87,7 @@ commercial-data-platform/
 
 ### 2. Authenticate the CLI
 ```bash
-databricks configure        # or: databricks auth login --host https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+databricks configure        # or: databricks auth login --host https://adb-1234567890123456.7.azuredatabricks.net
 ```
 
 ### 3. One-time platform setup (catalogs, schemas, volumes, grants)

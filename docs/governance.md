@@ -2,7 +2,7 @@
 
 > **Program:** Commercial Data Platform (CDP) — a Salesforce-like CRM + SAP-like ERP
 > feeding a medallion lakehouse.
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+> **Workspace:** `https://adb-1234567890123456.7.azuredatabricks.net` (Azure Databricks)
 > **Governance engine:** Unity Catalog (UC).
 >
 > This document describes **how the platform is governed**: the object model, the
@@ -49,8 +49,8 @@ account. Its object hierarchy:
         │     │     ├── Function    SQL UDFs, masking functions, row filters
         │     │     └── Model       (MLflow / UC-registered models)
         │     └── ...
-        ├── Storage Credential      IAM role UC assumes to reach S3
-        ├── External Location       S3 path + credential (governs volumes/ext tables)
+        ├── Storage Credential      Azure managed identity (Access Connector) UC uses to reach ADLS Gen2
+        ├── External Location       abfss:// path + credential (governs volumes/ext tables)
         └── Share / Recipient       (Delta Sharing, if/when used externally)
 ```
 

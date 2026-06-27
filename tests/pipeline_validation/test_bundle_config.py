@@ -89,4 +89,4 @@ def test_landing_volume_and_notifications_declared():
 
 def test_workspace_host_present():
     text = _read_bundle_text()
-    assert "dbc-0d3c2f0f-de7b.cloud.databricks.com" in text
+    assert "adb-1234567890123456.7.azuredatabricks.net" in text

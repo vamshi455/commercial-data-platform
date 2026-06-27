@@ -118,7 +118,7 @@ Workspace + Unity Catalog (deploy/run as service principal)
 
 | Secret | Scope | Purpose |
 |---|---|---|
-| `DATABRICKS_HOST` | repo or environment | Workspace URL `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` |
+| `DATABRICKS_HOST` | repo or environment | Workspace URL `https://adb-1234567890123456.7.azuredatabricks.net` |
 | `DATABRICKS_CLIENT_ID` | **environment** (`qa`, `prod`) | OAuth SP client id |
 | `DATABRICKS_CLIENT_SECRET` | **environment** (`qa`, `prod`) | OAuth SP secret |
 | `DEPLOY_SERVICE_PRINCIPAL` | environment | SP application id for `run_as` var |
@@ -265,7 +265,7 @@ A change cannot reach the next environment until **all** pass:
 3.  Add GitHub repo/env secrets:
        DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET, DEPLOY_SERVICE_PRINCIPAL
        (qa & prod in GitHub Environments; configure required reviewers on `prod`).
-4.  Local auth (one-time):  databricks auth login --host https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+4.  Local auth (one-time):  databricks auth login --host https://adb-1234567890123456.7.azuredatabricks.net
 5.  Validate:               databricks bundle validate -t dev
 6.  Deploy dev:             databricks bundle deploy   -t dev
 7.  Seed landing data:      run data_gen / scripts to land files in /Volumes/cdp_dev/landing/files
