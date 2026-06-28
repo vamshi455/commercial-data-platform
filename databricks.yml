@@ -24,10 +24,15 @@ variables:
     default: /Volumes/cdp_dev/landing/files
   notifications_email:
     description: Where job-failure alerts are sent.
-    default: vamshi455@gmail.com
+    default: vsingam@mhktechinc.com
   pipeline_channel:
     description: DLT / Lakeflow runtime channel (CURRENT or PREVIEW).
     default: CURRENT
+  pipeline_development:
+    description: >-
+      DLT development mode. true = fail fast, NO auto-retries on failure, reuse
+      compute (dev). false = production mode (auto-retry recoverable failures).
+    default: "false"
   deploy_service_principal:
     description: >-
       Service principal application ID used to run QA/PROD jobs and pipelines.
@@ -49,18 +54,19 @@ targets:
     mode: development          # prefixes resources with [dev <user>], pauses schedules
     default: true
     workspace:
-      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      host: https://adb-7405618019865738.18.azuredatabricks.net
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/dev
     variables:
       catalog: cdp_dev
       landing_volume: /Volumes/cdp_dev/landing/files
       pipeline_channel: PREVIEW
+      pipeline_development: "true"
 
   # ---- QA: validation, integration tests, UAT. Shared, scheduled paused. ----
   qa:
     mode: production
     workspace:
-      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      host: https://adb-7405609146609460.0.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/qa
     variables:
       catalog: cdp_qa
@@ -77,7 +83,7 @@ targets:
   prod:
     mode: production
     workspace:
-      host: https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+      host: https://adb-7405607547386885.5.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/prod
     variables:
       catalog: cdp_prod

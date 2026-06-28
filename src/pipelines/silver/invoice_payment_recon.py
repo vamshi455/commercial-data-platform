@@ -44,7 +44,7 @@ from pyspark.sql import functions as F
 # ---------------------------------------------------------------------------
 
 @dlt.table(
-    name="silver_payment",
+    name="silver.silver_payment",
     comment="Conformed ERP payments keyed to customer + invoice.",
     table_properties={"quality": "silver"},
 )
@@ -53,8 +53,8 @@ from pyspark.sql import functions as F
 @dlt.expect("sane_payment_date", "payment_date IS NULL OR payment_date <= current_date()")
 @dlt.expect("valid_currency", "currency IS NULL OR length(currency) = 3")
 def silver_payment():
-    p = dlt.read("bronze_erp_payments")
-    cust = dlt.read("silver_customer").select("customer_sk", "erp_customer_id")
+    p = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_erp_payments")
+    cust = dlt.read("silver.silver_customer").select("customer_sk", "erp_customer_id")
     return (
         p.join(cust, p.customer_id == cust.erp_customer_id, "left")
         .select(
@@ -66,8 +66,8 @@ def silver_payment():
             F.to_date("payment_date").alias("payment_date")
             if "payment_date" in p.columns
             else F.lit(None).cast("date").alias("payment_date"),
-            F.col("amount").cast("decimal(18,2)").alias("payment_amount")
-            if "amount" in p.columns
+            F.col("amount_paid_usd").cast("decimal(18,2)").alias("payment_amount")
+            if "amount_paid_usd" in p.columns
             else F.lit(None).cast("decimal(18,2)").alias("payment_amount"),
             F.upper(F.col("currency")).alias("currency") if "currency" in p.columns
             else F.lit(None).cast("string").alias("currency"),
@@ -80,7 +80,7 @@ def silver_payment():
 # ---------------------------------------------------------------------------
 
 @dlt.table(
-    name="silver_invoice",
+    name="silver.silver_invoice",
     comment="Conformed ERP invoices reconciled against payments (open/partial/late).",
     table_properties={"quality": "silver"},
 )
@@ -90,8 +90,8 @@ def silver_payment():
 @dlt.expect("date_sanity", "due_date IS NULL OR invoice_date IS NULL OR due_date >= invoice_date")
 @dlt.expect("referential_customer", "customer_sk IS NOT NULL")
 def silver_invoice():
-    inv = dlt.read("bronze_erp_invoices")
-    cust = dlt.read("silver_customer").select("customer_sk", "erp_customer_id")
+    inv = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_erp_invoices")
+    cust = dlt.read("silver.silver_customer").select("customer_sk", "erp_customer_id")
 
     base = (
         inv.join(cust, inv.customer_id == cust.erp_customer_id, "left")
@@ -104,9 +104,9 @@ def silver_invoice():
             else F.lit(None).cast("date").alias("invoice_date"),
             F.to_date("due_date").alias("due_date") if "due_date" in inv.columns
             else F.lit(None).cast("date").alias("due_date"),
-            F.col("gross_amount").cast("decimal(18,2)").alias("gross_amount")
-            if "gross_amount" in inv.columns
-            else F.col("amount").cast("decimal(18,2)").alias("gross_amount"),
+            F.col("amount_usd").cast("decimal(18,2)").alias("gross_amount")
+            if "amount_usd" in inv.columns
+            else F.lit(None).cast("decimal(18,2)").alias("gross_amount"),
             F.upper(F.col("currency")).alias("currency") if "currency" in inv.columns
             else F.lit(None).cast("string").alias("currency"),
             (F.col("is_disputed").cast("boolean")
@@ -117,7 +117,7 @@ def silver_invoice():
 
     # Aggregate applied payments per invoice.
     pay = (
-        dlt.read("silver_payment")
+        dlt.read("silver.silver_payment")
         .where("invoice_id IS NOT NULL")
         .groupBy("invoice_id")
         .agg(F.sum("payment_amount").alias("amount_paid"))

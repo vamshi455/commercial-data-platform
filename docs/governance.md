@@ -2,7 +2,7 @@
 
 > **Program:** Commercial Data Platform (CDP) — a Salesforce-like CRM + SAP-like ERP
 > feeding a medallion lakehouse.
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+> **Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
 > **Governance engine:** Unity Catalog (UC).
 >
 > This document describes **how the platform is governed**: the object model, the
@@ -49,8 +49,8 @@ account. Its object hierarchy:
         │     │     ├── Function    SQL UDFs, masking functions, row filters
         │     │     └── Model       (MLflow / UC-registered models)
         │     └── ...
-        ├── Storage Credential      IAM role UC assumes to reach S3
-        ├── External Location       S3 path + credential (governs volumes/ext tables)
+        ├── Storage Credential      Access Connector (managed identity) UC assumes to reach ADLS Gen2
+        ├── External Location       ADLS Gen2 (abfss://) path + credential (governs volumes/ext tables)
         └── Share / Recipient       (Delta Sharing, if/when used externally)
 ```
 
@@ -241,6 +241,18 @@ A **column mask** is a SQL UDF bound to a column via `ALTER TABLE ... SET MASK`.
 UC invokes it transparently on every read; what the caller sees depends on
 **their group membership** (evaluated with `is_account_group_member()`). The base
 data is unchanged — masking is read-time.
+
+> **Prod-strict environment guard.** Every mask and row filter short-circuits on
+> `gold.is_prod()` — a boolean UDF whose value is **baked in at deploy time** from
+> the bundle target (`env`). It is `TRUE` only in `cdp_prod`, so masks and row
+> filters **enforce strictly in prod** and **relax on the synthetic dev/qa data**,
+> letting engineers iterate without fighting redaction. Because the target is a
+> literal in the function body (a mask UDF can't read session params), the guard
+> cannot be flipped at query time. To also lock down QA, change the baked
+> predicate to `env IN ('qa','prod')` in
+> [governance/masking_functions.sql](../governance/masking_functions.sql) /
+> [notebooks/setup/02](../notebooks/setup/02_masking_row_filters.sql). The guard is
+> created first so every downstream mask/filter can call it.
 
 ### 6.1 Email mask (`pii`)
 

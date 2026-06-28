@@ -1,8 +1,10 @@
 # =============================================================================
 # CI — runs on every pull request. Validates the Databricks Asset Bundle and
 # runs Python syntax checks + unit tests. NO deploy happens here.
-# Auth: OAuth machine-to-machine (M2M) via a service principal. The Databricks
-# CLI auto-detects DATABRICKS_HOST + DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET.
+# Auth: Workload Identity Federation (WIF) — GitHub OIDC. The job mints a
+# short-lived GitHub OIDC token (needs `permissions: id-token: write`) that the
+# Databricks CLI exchanges for a Databricks token. NO DATABRICKS_CLIENT_SECRET is
+# stored — this is the recommended, most secure CI/CD auth. See docs/cicd.md §4.
 # =============================================================================
 name: ci
 
@@ -22,11 +24,17 @@ concurrency:
 jobs:
   validate-and-test:
     runs-on: ubuntu-latest
-    # Repo-level secrets are fine for validate (read-only, dev target).
+    # id-token: write lets this job mint the GitHub OIDC token WIF exchanges for
+    # a Databricks token. contents: read is the least-privilege default for checkout.
+    permissions:
+      id-token: write
+      contents: read
+    # HOST + CLIENT_ID (the SP app id) are non-secret identifiers; no client secret.
+    # DATABRICKS_AUTH_TYPE pins the CLI to GitHub OIDC so misconfig fails loudly.
     env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_AUTH_TYPE: github-oidc
     steps:
       - name: Checkout
         uses: actions/checkout@v4

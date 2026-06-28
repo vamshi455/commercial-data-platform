@@ -42,21 +42,21 @@ def _month(col):
 @dlt.expect("has_period", "period_month IS NOT NULL")
 def gold_revenue_pipeline():
     bookings = (
-        dlt.read("silver_contract")
+        dlt.read("silver.silver_contract")
         .withColumn("period_month", _month(F.col("start_date")))
         .groupBy("customer_sk", "period_month")
         .agg(F.sum("contract_amount").alias("booked_amount"),
              F.count("*").alias("booking_count"))
     )
     orders = (
-        dlt.read("silver_sales_order")
+        dlt.read("silver.silver_sales_order")
         .withColumn("period_month", _month(F.col("order_date")))
         .groupBy("customer_sk", "period_month")
         .agg(F.sum("net_amount").alias("ordered_amount"),
              F.count("*").alias("order_count"))
     )
     billings = (
-        dlt.read("silver_invoice")
+        dlt.read("silver.silver_invoice")
         .withColumn("period_month", _month(F.col("invoice_date")))
         .groupBy("customer_sk", "period_month")
         .agg(F.sum("gross_amount").alias("billed_amount"),

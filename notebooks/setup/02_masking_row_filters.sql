@@ -12,21 +12,53 @@
 -- COMMAND ----------
 
 CREATE WIDGET TEXT catalog DEFAULT 'cdp_dev';
+-- env is passed by job_platform_setup (= bundle target). Drives the prod-strict guard.
+CREATE WIDGET TEXT env DEFAULT 'dev';
 USE CATALOG IDENTIFIER(:catalog);
 USE SCHEMA gold;
 
 -- COMMAND ----------
 
+-- MAGIC %md
+-- MAGIC ## Environment guard — `gold.is_prod()`
+-- MAGIC Every mask and row filter short-circuits on this function: **strict in
+-- MAGIC `cdp_prod`, relaxed on synthetic dev/qa data** so engineers can iterate
+-- MAGIC without fighting masks. The deploy target is *baked in as a literal* at
+-- MAGIC create time (a column-mask UDF body can't read session params), so the
+-- MAGIC guard cannot be flipped at query time.
+-- MAGIC
+-- MAGIC To make QA strict too, change the baked value to `env in ('qa','prod')`.
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC env = dbutils.widgets.get("env")
+-- MAGIC catalog = dbutils.widgets.get("catalog")
+-- MAGIC # Relax everywhere except prod. Flip to `env in ("qa", "prod")` for qa-strict.
+-- MAGIC is_prod_literal = "true" if env == "prod" else "false"
+-- MAGIC spark.sql(f"""
+-- MAGIC   CREATE OR REPLACE FUNCTION {catalog}.gold.is_prod()
+-- MAGIC     RETURNS BOOLEAN
+-- MAGIC     COMMENT 'Environment guard: TRUE only in prod (baked at deploy time from the bundle target). Masks/row-filters enforce when TRUE and relax on synthetic dev/qa data.'
+-- MAGIC     RETURN {is_prod_literal}
+-- MAGIC """)
+-- MAGIC print(f"gold.is_prod() = {is_prod_literal}  (env={env}, catalog={catalog})")
+
+-- COMMAND ----------
+
 -- MAGIC %md ## Masking UDFs
+-- MAGIC Pattern: `WHEN NOT gold.is_prod() THEN <clear>` relaxes non-prod; the
+-- MAGIC privileged-group and redaction branches only ever apply in prod.
 
 -- COMMAND ----------
 
 -- DBTITLE 1,mask_email
 CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
   RETURNS STRING
-  COMMENT 'Column mask: redacts the local part of an email unless caller is a privileged group.'
+  COMMENT 'Column mask: redacts the local part of an email unless caller is a privileged group. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN email          -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_customer_success')
@@ -40,9 +72,10 @@ CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
 -- DBTITLE 1,mask_phone
 CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
   RETURNS STRING
-  COMMENT 'Column mask: shows only the last 4 digits of a phone number for non-privileged callers.'
+  COMMENT 'Column mask: shows only the last 4 digits of a phone number for non-privileged callers. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN phone          -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_customer_success')
@@ -56,9 +89,10 @@ CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
 -- DBTITLE 1,mask_tax_id
 CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
   RETURNS STRING
-  COMMENT 'Column mask: financial_sensitive — shows last 4 of a tax/EIN/SSN; full for finance & stewards.'
+  COMMENT 'Column mask: financial_sensitive — shows last 4 of a tax/EIN/SSN; full for finance & stewards. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN tax_id         -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_finance_analysts')
@@ -72,9 +106,10 @@ CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
 -- DBTITLE 1,mask_free_text
 CREATE OR REPLACE FUNCTION gold.mask_free_text(txt STRING)
   RETURNS STRING
-  COMMENT 'Column mask: restricted_free_text — redacts unstructured notes unless caller is a steward/platform.'
+  COMMENT 'Column mask: restricted_free_text — redacts unstructured notes unless caller is a steward/platform. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN txt            -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
       THEN txt
@@ -107,9 +142,10 @@ ALTER TABLE gold.account_health      ALTER COLUMN steward_notes   SET MASK gold.
 
 CREATE OR REPLACE FUNCTION gold.territory_filter(territory STRING)
   RETURNS BOOLEAN
-  COMMENT 'Row filter: unrestricted for finance/stewards/platform; sales_analysts see only mapped territories.'
+  COMMENT 'Row filter: unrestricted for finance/stewards/platform; sales_analysts see only mapped territories. Relaxed (all rows) in non-prod.'
   RETURN
-    is_account_group_member('cdp_data_stewards')
+    NOT gold.is_prod()                            -- dev/qa: synthetic data, no row scoping
+    OR is_account_group_member('cdp_data_stewards')
     OR is_account_group_member('cdp_platform_engineers')
     OR is_account_group_member('cdp_finance_analysts')
     OR is_account_group_member('cdp_analytics_engineers')

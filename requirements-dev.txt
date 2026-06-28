@@ -1,0 +1,8 @@
+# Local dev / CI dependencies.
+#
+# NOTE: the data generators (data_gen/) and the pipeline code (src/) need NO
+# third-party packages — generators are pure stdlib, pipelines run on the
+# Databricks runtime where pyspark/dbutils are provided. These deps are only for
+# running the test suite and YAML tooling locally (mirrors .github/workflows/ci.yml).
+pytest>=7
+pyyaml>=6

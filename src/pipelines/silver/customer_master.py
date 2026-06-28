@@ -41,12 +41,186 @@ import dlt
 from pyspark.sql import functions as F
 from pyspark.sql import Window
 
-from src.pipelines._common import (
-    crosswalk_path,
-    normalize_domain,
-    normalize_name,
-    surrogate_key,
-)
+# ---------------------------------------------------------------------------
+# Inlined from src/pipelines/_common.py — serverless DLT cannot reliably IMPORT
+# a .py from /Workspace files (OSError Errno 5), so the shared helpers are
+# inlined here. _common.py remains the source of truth for local/test use.
+# ---------------------------------------------------------------------------
+from pyspark.sql import DataFrame  # noqa: F401 (inlined helper annotations)
+from pyspark.sql.column import Column  # noqa: F401
+
+# ---------------------------------------------------------------------------
+# Entity registries — single source of truth, reused by the Auto Loader
+# factories so the ingestion files stay DRY.
+# ---------------------------------------------------------------------------
+
+CRM_ENTITIES: list[str] = [
+    "accounts", "contacts", "leads", "opportunities", "opportunity_line_items",
+    "quotes", "contracts", "activities", "cases", "users", "territories",
+]
+
+ERP_ENTITIES: list[str] = [
+    "customers", "vendors", "products", "sales_orders", "sales_order_items",
+    "billing_documents", "invoices", "payments", "purchase_orders",
+    "gl_entries", "cost_centers", "profit_centers", "currency_rates",
+]
+
+REFERENCE_ENTITIES: list[str] = [
+    "fiscal_calendar", "product_hierarchy", "currency_rates", "country_codes",
+]
+
+
+# ---------------------------------------------------------------------------
+# Configuration getters
+# ---------------------------------------------------------------------------
+
+def get_catalog(default: str = "cdp_dev") -> str:
+    """Return the target Unity Catalog name.
+
+    Reads ``cdp.catalog`` from the Spark config (set by the DLT pipeline
+    ``configuration`` block / bundle ``var.catalog``). Falls back to
+    ``cdp_dev`` so the module is safe to import even if the key is unset.
+    """
+    return spark.conf.get("cdp.catalog", default)  # noqa: F821 (spark is a runtime global)
+
+
+def get_landing_path(default: str = "/Volumes/cdp_dev/landing/files") -> str:
+    """Return the root landing path/Volume for raw source files.
+
+    Reads ``cdp.landing_path`` from the Spark config. The generators write to::
+
+        <landing>/crm/<entity>/dt=YYYY-MM-DD/*.csv
+        <landing>/erp/<entity>/dt=YYYY-MM-DD/*.csv
+        <landing>/reference/<entity>/*.csv
+
+    Trailing slashes are stripped so callers can safely f-string a suffix.
+    """
+    return spark.conf.get("cdp.landing_path", default).rstrip("/")  # noqa: F821
+
+
+def landing_glob(source_system: str, entity: str) -> str:
+    """Build the Auto Loader input path for one source entity.
+
+    ``source_system`` is one of ``crm`` / ``erp`` / ``reference``. We point
+    Auto Loader at the *entity* directory and let it walk the ``dt=...``
+    partitions (``cloudFiles`` discovers new files under the path over time).
+    """
+    return f"{get_landing_path()}/{source_system}/{entity}"
+
+
+def schema_location(source_system: str, entity: str) -> str:
+    """Per-entity schema/checkpoint location for Auto Loader schema inference.
+
+    Auto Loader persists the inferred schema (and tracks evolution) here. It
+    lives under the landing root in a hidden ``_schemas`` folder, namespaced by
+    source + entity so entities never collide.
+    """
+    return f"{get_landing_path()}/_schemas/{source_system}/{entity}"
+
+
+# ---------------------------------------------------------------------------
+# Audit columns
+# ---------------------------------------------------------------------------
+
+def with_audit_columns(df: DataFrame, batch_id: str | None = None) -> DataFrame:
+    """Append the standard bronze audit columns to a DataFrame.
+
+    Convention (see src/pipelines/bronze/README.md):
+      * ``_ingested_at`` -- processing-time the row was ingested
+      * ``_source_file`` -- the file the row came from (``_metadata.file_path``)
+      * ``_batch_id``    -- logical batch label (defaults to ingest date)
+      * ``_rescued_data`` -- Auto Loader's rescued-data column (already present
+        on the streaming DataFrame when ``rescuedDataColumn`` is configured;
+        we leave it as-is and only add it as NULL if missing so the bronze
+        schema is uniform across entities).
+
+    ``_metadata`` is a hidden struct column Auto Loader/Spark exposes on file
+    sources; ``_metadata.file_path`` is the modern replacement for the
+    deprecated ``input_file_name()``.
+    """
+    out = (
+        df.withColumn("_ingested_at", F.current_timestamp())
+          .withColumn("_source_file", F.col("_metadata.file_path"))
+    )
+    # batch id defaults to the ingest date (yyyy-MM-dd) when not supplied.
+    if batch_id is None:
+        out = out.withColumn("_batch_id", F.date_format(F.current_timestamp(), "yyyy-MM-dd"))
+    else:
+        out = out.withColumn("_batch_id", F.lit(batch_id))
+
+    # Guarantee a uniform _rescued_data column even if a source had no rescues.
+    if "_rescued_data" not in out.columns:
+        out = out.withColumn("_rescued_data", F.lit(None).cast("string"))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Normalisation helpers (used heavily by silver identity resolution)
+# ---------------------------------------------------------------------------
+
+# Common company-name "noise" suffixes we strip to improve deterministic match.
+_LEGAL_SUFFIXES = [
+    "incorporated", "inc", "corporation", "corp", "company", "co",
+    "limited", "ltd", "llc", "llp", "lp", "plc", "gmbh", "ag", "sa", "nv",
+    "bv", "pty", "group", "holdings", "the",
+]
+
+
+def normalize_name(col: "Column | str") -> Column:
+    """Return a normalised company/person name column for fuzzy-deterministic match.
+
+    Steps: lower-case -> strip accents-ish punctuation -> collapse whitespace ->
+    drop common legal suffixes -> trim. This produces a stable join key so
+    "Apex Industries, Inc." and "apex industries inc" resolve to the same key.
+
+    Accepts either a column name (str) or an existing ``Column``.
+    """
+    c = F.col(col) if isinstance(col, str) else col
+    c = F.lower(c)
+    # Remove anything that is not a letter, digit or space.
+    c = F.regexp_replace(c, r"[^a-z0-9\s]", " ")
+    # Drop standalone legal-suffix tokens (word-boundary match).
+    for suffix in _LEGAL_SUFFIXES:
+        c = F.regexp_replace(c, rf"\b{suffix}\b", " ")
+    # Collapse repeated whitespace and trim.
+    c = F.trim(F.regexp_replace(c, r"\s+", " "))
+    return c
+
+
+def normalize_domain(col: "Column | str") -> Column:
+    """Extract a normalised email/web domain (lower-cased, no leading www.).
+
+    From an email like ``a.b@apex.com`` returns ``apex.com``; from a bare
+    domain it just normalises case and strips ``www.``.
+    """
+    c = F.col(col) if isinstance(col, str) else col
+    c = F.lower(F.trim(c))
+    # If it's an email, take the part after '@'.
+    c = F.when(c.contains("@"), F.split(c, "@").getItem(1)).otherwise(c)
+    c = F.regexp_replace(c, r"^www\.", "")
+    return c
+
+
+def surrogate_key(*cols: "Column | str") -> Column:
+    """Deterministic surrogate-key hash from one or more business-key columns.
+
+    Uses SHA-2(256) over a ``||``-joined, null-safe concatenation so the same
+    business key always maps to the same surrogate across runs (stable, unlike
+    monotonically_increasing_id()).
+    """
+    resolved = [F.col(c) if isinstance(c, str) else c for c in cols]
+    coalesced = [F.coalesce(c.cast("string"), F.lit("")) for c in resolved]
+    return F.sha2(F.concat_ws("||", *coalesced), 256)
+
+
+def crosswalk_path() -> str:
+    """Path to the CRM<->ERP crosswalk JSON emitted by the data generators.
+
+    The generators persist a shared identity map at
+    ``<landing>/_crosswalk/crm_erp_crosswalk.json`` (see data_gen/common.py).
+    Silver identity resolution reads it as a deterministic match assist.
+    """
+    return f"{get_landing_path()}/_crosswalk/crm_erp_crosswalk.json"
 
 
 # ---------------------------------------------------------------------------
@@ -56,21 +230,21 @@ from src.pipelines._common import (
 
 @dlt.view(comment="CRM accounts, deduped to latest per source id, with match keys.")
 def stg_crm_accounts():
-    df = dlt.read("bronze_crm_accounts")
+    df = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_crm_accounts")
     # Pick the latest record per CRM account id (defensive dedup). We assume a
     # last-modified column from the source; fall back to ingest time.
-    mod_col = "last_modified_date" if "last_modified_date" in df.columns else "_ingested_at"
+    mod_col = "created_date" if "created_date" in df.columns else "_ingested_at"
     w = Window.partitionBy("account_id").orderBy(F.col(mod_col).desc())
     return (
         df.withColumn("_rn", F.row_number().over(w))
           .where("_rn = 1")
-          .withColumn("name_key", normalize_name("name"))
-          .withColumn("domain_key", normalize_domain(
-              F.coalesce(F.col("website"), F.col("email")) if "website" in df.columns
-              else F.col("email")))
+          .withColumn("name_key", normalize_name("account_name"))
+          # bronze_crm_accounts has no website/email column to derive a domain
+          # from, so the domain match key is null for CRM accounts.
+          .withColumn("domain_key", normalize_domain(F.lit(None).cast("string")))
           .select(
               F.col("account_id").alias("crm_account_id"),
-              F.col("name").alias("crm_name"),
+              F.col("account_name").alias("crm_name"),
               "name_key", "domain_key",
               F.col("billing_country").alias("crm_country")
               if "billing_country" in df.columns else F.lit(None).alias("crm_country"),
@@ -80,18 +254,19 @@ def stg_crm_accounts():
 
 @dlt.view(comment="ERP customers, deduped to latest per source id, with match keys.")
 def stg_erp_customers():
-    df = dlt.read("bronze_erp_customers")
-    mod_col = "changed_on" if "changed_on" in df.columns else "_ingested_at"
+    df = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_erp_customers")
+    mod_col = "created_date" if "created_date" in df.columns else "_ingested_at"
     w = Window.partitionBy("customer_id").orderBy(F.col(mod_col).desc())
-    domain_src = F.col("email") if "email" in df.columns else F.lit(None)
+    domain_src = (F.col("payment_contact_email") if "payment_contact_email" in df.columns
+                  else F.lit(None).cast("string"))
     return (
         df.withColumn("_rn", F.row_number().over(w))
           .where("_rn = 1")
-          .withColumn("name_key", normalize_name("name"))
+          .withColumn("name_key", normalize_name("customer_name"))
           .withColumn("domain_key", normalize_domain(domain_src))
           .select(
               F.col("customer_id").alias("erp_customer_id"),
-              F.col("name").alias("erp_name"),
+              F.col("customer_name").alias("erp_name"),
               "name_key", "domain_key",
               F.col("country").alias("erp_country")
               if "country" in df.columns else F.lit(None).alias("erp_country"),
@@ -132,7 +307,7 @@ def stg_crosswalk():
 # ---------------------------------------------------------------------------
 
 @dlt.table(
-    name="silver_customer",
+    name="silver.silver_customer",
     comment="Conformed customer master with CRM<->ERP identity resolution.",
     table_properties={"quality": "silver", "delta.enableChangeDataFeed": "true"},
 )
@@ -156,6 +331,10 @@ def silver_customer():
         crm_x.where("erp_customer_id IS NOT NULL")
         .join(erp, "erp_customer_id", "left")
         .withColumn("match_method", F.lit("crosswalk"))
+        # both stg_crm_accounts and stg_erp_customers carry name_key/domain_key;
+        # keep the CRM side and drop the ERP duplicates so the later
+        # _project select of name_key/domain_key is unambiguous.
+        .drop(erp.name_key).drop(erp.domain_key)
     )
 
     # --- Pass 2: deterministic name+domain match for the remainder ---------

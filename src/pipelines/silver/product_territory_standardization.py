@@ -42,26 +42,38 @@ from pyspark.sql import functions as F
 def stg_product_changes():
     # Stream products so apply_changes consumes them incrementally as a change
     # feed. We enrich with the reference product hierarchy (static read).
-    p = dlt.read_stream("bronze_erp_products")
-    hier = dlt.read("bronze_ref_product_hierarchy")
+    p = spark.readStream.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_erp_products")
+    hier_raw = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_ref_product_hierarchy")
 
-    seq_col = "changed_on" if "changed_on" in p.columns else "_ingested_at"
+    seq_col = "scd_version" if "scd_version" in p.columns else "_ingested_at"
+
+    # Products and the reference hierarchy share a ``division`` key (the
+    # hierarchy is per division/category, not per material). Narrow the
+    # hierarchy to just the columns we need and rename its join key so the
+    # stream-static join produces NO duplicated column names (division and the
+    # _ingested_at/_source_* audit columns exist on both sides otherwise).
+    hier = hier_raw.select(
+        hier_raw["division"].alias("_hier_division"),
+        (hier_raw["category"] if "category" in hier_raw.columns
+         else F.lit(None).cast("string")).alias("_hier_category"),
+        (hier_raw["subcategory"] if "subcategory" in hier_raw.columns
+         else F.lit(None).cast("string")).alias("_hier_subcategory"),
+    )
     join_cond = (
-        (p.product_id == hier.product_id)
-        if "product_id" in hier.columns
+        (p["division"] == hier["_hier_division"])
+        if "division" in p.columns
         else F.lit(False)
     )
     enriched = p.join(hier, join_cond, "left")
     return enriched.select(
-        p["product_id"],
-        F.trim(p["name"]).alias("product_name") if "name" in p.columns
+        p["material_id"].alias("product_id"),
+        F.trim(p["material_desc"]).alias("product_name") if "material_desc" in p.columns
         else F.lit(None).cast("string").alias("product_name"),
-        (hier["category"] if "category" in hier.columns
-         else F.lit(None).cast("string")).alias("category"),
-        (hier["family"] if "family" in hier.columns
-         else F.lit(None).cast("string")).alias("family"),
-        (p["unit_price"].cast("decimal(18,2)") if "unit_price" in p.columns
+        F.col("_hier_category").alias("category"),
+        F.col("_hier_subcategory").alias("family"),
+        (p["list_price_usd"].cast("decimal(18,2)") if "list_price_usd" in p.columns
          else F.lit(None).cast("decimal(18,2)")).alias("unit_price"),
+        # No product status column on bronze_erp_products; surface as null.
         (p["status"] if "status" in p.columns
          else F.lit(None).cast("string")).alias("status"),
         F.col(seq_col).alias("_seq"),
@@ -70,14 +82,14 @@ def stg_product_changes():
 
 # 1) Declare the SCD2 target streaming table.
 dlt.create_streaming_table(
-    name="silver_product",
+    name="silver.silver_product",
     comment="Product dimension, SCD Type 2 history (validity windows).",
     table_properties={"quality": "silver"},
 )
 
 # 2) Apply the change feed into it as Type 2 history.
 dlt.apply_changes(
-    target="silver_product",
+    target="silver.silver_product",
     source="stg_product_changes",
     keys=["product_id"],
     sequence_by=F.col("_seq"),
@@ -92,17 +104,17 @@ dlt.apply_changes(
 # ---------------------------------------------------------------------------
 
 @dlt.table(
-    name="silver_territory",
+    name="silver.silver_territory",
     comment="Standardized CRM territory dimension.",
     table_properties={"quality": "silver"},
 )
 @dlt.expect_or_drop("has_territory_id", "territory_id IS NOT NULL")
 @dlt.expect("has_name", "territory_name IS NOT NULL")
 def silver_territory():
-    t = dlt.read("bronze_crm_territories")
+    t = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_crm_territories")
     return t.select(
         F.col("territory_id"),
-        F.trim(F.col("name")).alias("territory_name") if "name" in t.columns
+        F.trim(F.col("territory_name")).alias("territory_name") if "territory_name" in t.columns
         else F.lit(None).cast("string").alias("territory_name"),
         F.col("parent_territory_id") if "parent_territory_id" in t.columns
         else F.lit(None).cast("string").alias("parent_territory_id"),

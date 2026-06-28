@@ -1,6 +1,8 @@
 # =============================================================================
 # Deploy to PROD — runs on a version tag push (`v*`) or push to `main`.
-# Uses the PROD service principal credentials from the GitHub Environment "prod".
+# Authenticates as the PROD service principal via Workload Identity Federation
+# (WIF) — GitHub OIDC, no stored client secret. The PROD SP's federation policy
+# must trust this repo's `prod` environment subject (see docs/cicd.md §4).
 #
 # APPROVAL GATE
 # -------------
@@ -33,10 +35,15 @@ jobs:
     # <-- This binds the job to the "prod" Environment and triggers the
     #     required-reviewers approval gate before any step runs.
     environment: prod
+    permissions:
+      id-token: write      # mint the GitHub OIDC token for WIF
+      contents: read
+    # Non-secret identifiers, stored as environment-scoped GitHub *variables*.
     env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      BUNDLE_VAR_deploy_service_principal: ${{ vars.DEPLOY_SERVICE_PRINCIPAL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

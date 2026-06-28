@@ -14,7 +14,7 @@ resources:
       schema: gold              # default publish schema; silver flows publish to silver
       serverless: true
       channel: ${var.pipeline_channel}
-      development: false
+      development: ${var.pipeline_development}
       continuous: false
       photon: true
       libraries:
@@ -26,11 +26,8 @@ resources:
             include: ../src/pipelines/gold/**
       configuration:
         cdp.catalog: ${var.catalog}
+        # Deployed bundle root, added to sys.path by each module so
+        # `src.pipelines._common` imports resolve under serverless DLT.
+        cdp.source_root: ${workspace.file_path}
         cdp.silver_schema: silver
         cdp.gold_schema: gold
-      notifications:
-        - email_recipients:
-            - ${var.notifications_email}
-          alerts:
-            - on-update-failure
-            - on-flow-failure

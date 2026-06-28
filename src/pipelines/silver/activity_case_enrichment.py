@@ -34,7 +34,7 @@ from pyspark.sql import functions as F
 
 def _customer_lookup():
     """CRM-account -> customer_sk lookup used by both tables."""
-    return dlt.read("silver_customer").select("customer_sk", "crm_account_id")
+    return dlt.read("silver.silver_customer").select("customer_sk", "crm_account_id")
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ def _customer_lookup():
 # ---------------------------------------------------------------------------
 
 @dlt.table(
-    name="silver_activity",
+    name="silver.silver_activity",
     comment="CRM activities enriched to customer; free-text flagged restricted.",
     table_properties={
         "quality": "silver",
@@ -53,7 +53,7 @@ def _customer_lookup():
 @dlt.expect_or_drop("has_activity_id", "activity_id IS NOT NULL")
 @dlt.expect("has_customer", "customer_sk IS NOT NULL")
 def silver_activity():
-    a = dlt.read("bronze_crm_activities")
+    a = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_crm_activities")
     cust = _customer_lookup()
 
     desc = F.col("description") if "description" in a.columns else F.lit(None).cast("string")
@@ -67,8 +67,8 @@ def silver_activity():
             F.col("account_id").alias("crm_account_id"),
             (F.col("activity_type") if "activity_type" in a.columns
              else F.lit(None).cast("string")).alias("activity_type"),
-            F.to_date("activity_date").alias("activity_date")
-            if "activity_date" in a.columns
+            F.to_date("activity_datetime").alias("activity_date")
+            if "activity_datetime" in a.columns
             else F.lit(None).cast("date").alias("activity_date"),
             subj.alias("subject_text"),
             desc.alias("description_text"),
@@ -85,7 +85,7 @@ def silver_activity():
 # ---------------------------------------------------------------------------
 
 @dlt.table(
-    name="silver_case",
+    name="silver.silver_case",
     comment="CRM support cases enriched to customer; free-text flagged restricted.",
     table_properties={
         "quality": "silver",
@@ -96,13 +96,14 @@ def silver_activity():
 @dlt.expect("has_customer", "customer_sk IS NOT NULL")
 @dlt.expect("date_sanity", "closed_date IS NULL OR created_date IS NULL OR closed_date >= created_date")
 def silver_case():
-    c = dlt.read("bronze_crm_cases")
+    c = spark.read.table(f"{spark.conf.get('cdp.catalog', 'cdp_dev')}.bronze.bronze_crm_cases")
     cust = _customer_lookup()
 
     subj = F.col("subject") if "subject" in c.columns else F.lit(None).cast("string")
-    desc = F.col("description") if "description" in c.columns else F.lit(None).cast("string")
-    created = (F.to_timestamp("created_date") if "created_date" in c.columns
+    desc = F.col("case_comment") if "case_comment" in c.columns else F.lit(None).cast("string")
+    created = (F.to_timestamp("opened_date") if "opened_date" in c.columns
                else F.lit(None).cast("timestamp"))
+    # No closed/resolved date column exists on bronze_crm_cases.
     closed = (F.to_timestamp("closed_date") if "closed_date" in c.columns
               else F.lit(None).cast("timestamp"))
     status = F.col("status") if "status" in c.columns else F.lit(None).cast("string")

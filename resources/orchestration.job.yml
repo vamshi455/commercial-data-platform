@@ -23,10 +23,6 @@ resources:
         timezone_id: America/New_York
         pause_status: UNPAUSED                   # dev mode overrides this to PAUSED
 
-      email_notifications:
-        on_failure:
-          - ${var.notifications_email}
-        no_alert_for_skipped_runs: true
 
       tasks:
         # 1) CRM ingestion -> bronze

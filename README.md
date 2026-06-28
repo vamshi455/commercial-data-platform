@@ -6,10 +6,18 @@ A production-style Databricks lakehouse that unifies a **Salesforce-like CRM** d
 It is built to look and operate like a real enterprise commercial data platform — not a learning
 lab — using the current Databricks stack: **Unity Catalog** governance, **Lakeflow / DLT
 declarative pipelines**, **Auto Loader** ingestion, a **medallion (bronze→silver→gold)**
-architecture, a **Delta + selective Managed Iceberg** table strategy, automatic **lineage**, and
-**Databricks Asset Bundles** for `dev → qa → prod` CI/CD.
+architecture, a **Delta + selective Managed Iceberg** table strategy, and automatic **lineage**.
 
-> **Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+**Delivery model** (`dev → qa → prod`):
+
+- **Databricks Asset Bundles (DABs)** — infrastructure-as-code: jobs, pipelines, and
+  permissions are declared in `databricks.yml` + `resources/*.yml`, deployed per target.
+- **GitHub Actions** — delivery: PR validation and gated promotion to qa/prod
+  (`.github/workflows/`).
+- **OIDC federation (Workload Identity Federation)** — authentication: CI assumes a
+  service principal via GitHub OIDC, **no stored Databricks secrets**.
+
+> **Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
 > **Catalogs:** `cdp_dev`, `cdp_qa`, `cdp_prod`
 
 ---
@@ -85,7 +93,7 @@ commercial-data-platform/
 
 ### 2. Authenticate the CLI
 ```bash
-databricks configure        # or: databricks auth login --host https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+databricks configure        # or: databricks auth login --host https://adb-7405618019865738.18.azuredatabricks.net
 ```
 
 ### 3. One-time platform setup (catalogs, schemas, volumes, grants)

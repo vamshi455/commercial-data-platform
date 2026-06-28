@@ -1,7 +1,7 @@
 # Commercial Data Platform — Architecture
 
 > **Audience:** Platform engineers, data engineers, analytics engineers, and architects working on the Commercial Data Platform (CDP).
-> **Scope:** End-to-end technical architecture of the medallion lakehouse that unifies the CRM and ERP systems on AWS Databricks.
+> **Scope:** End-to-end technical architecture of the medallion lakehouse that unifies the CRM and ERP systems on Azure Databricks.
 
 **Related docs:**
 - [`source-systems.md`](./source-systems.md) — detailed CRM/ERP source models, entities, and the identity problem
@@ -30,7 +30,7 @@ These systems answer different questions and rarely agree on identifiers, granul
 | Open, interoperable gold | Delta everywhere + **Managed Iceberg (UC)** for select externally-consumed gold products |
 | Reproducible delivery | Databricks Asset Bundles (DABs) for CI/CD across `cdp_dev` → `cdp_qa` → `cdp_prod` |
 
-**Workspace:** `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` (AWS Databricks)
+**Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
 **Catalogs (one per environment):** `cdp_dev`, `cdp_qa`, `cdp_prod`
 **Schemas per catalog:** `landing`, `bronze`, `silver`, `gold`, `ops`, `sandbox` (sandbox in **dev only**)
 
@@ -298,7 +298,7 @@ Reference data is small, slowly-changing, and shared across domains. It is confo
 - **System tables** (billing/usage) drive cost attribution by domain/job.
 
 ### 10.3 Disaster recovery
-- Data resides in cloud object storage (S3) with versioning and cross-region replication per the org DR tier.
+- Data resides in cloud object storage (ADLS Gen2) with versioning and cross-region replication per the org DR tier.
 - **UC metadata** and pipeline definitions are reproducible from **Databricks Asset Bundles** in git, so a workspace can be re-provisioned and re-pointed at replicated storage.
 - **RPO/RTO** are bounded by storage replication lag and the time to redeploy bundles + restart pipelines; because pipelines are declarative and idempotent, recovery is a redeploy + rerun rather than a manual rebuild.
 

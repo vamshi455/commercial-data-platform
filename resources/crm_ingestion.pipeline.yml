@@ -12,7 +12,7 @@ resources:
       schema: bronze            # target schema for materialized bronze tables
       serverless: true
       channel: ${var.pipeline_channel}
-      development: false
+      development: ${var.pipeline_development}
       continuous: false
       photon: true
       libraries:
@@ -20,12 +20,9 @@ resources:
             path: ../src/pipelines/ingestion/crm_autoloader.py
       configuration:
         cdp.catalog: ${var.catalog}
+        # Deployed bundle root, added to sys.path by each module so
+        # `src.pipelines._common` imports resolve under serverless DLT.
+        cdp.source_root: ${workspace.file_path}
         cdp.landing_path: ${var.landing_volume}
         cdp.source_system: crm
         cdp.target_schema: bronze
-      notifications:
-        - email_recipients:
-            - ${var.notifications_email}
-          alerts:
-            - on-update-failure
-            - on-flow-failure

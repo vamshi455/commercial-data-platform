@@ -33,7 +33,7 @@ from pyspark.sql import functions as F
 )
 @dlt.expect_or_drop("has_customer", "customer_sk IS NOT NULL")
 def gold_collections_risk():
-    inv = dlt.read("silver_invoice").where("open_amount > 0")
+    inv = dlt.read("silver.silver_invoice").where("open_amount > 0")
 
     dpd = F.col("days_past_due")
     open_amt = F.col("open_amount")
@@ -58,7 +58,7 @@ def gold_collections_risk():
         )
     )
 
-    cust = dlt.read("silver_customer").select("customer_sk", "company_name", "country")
+    cust = dlt.read("silver.silver_customer").select("customer_sk", "company_name", "country")
 
     return (
         aging.join(cust, "customer_sk", "left")

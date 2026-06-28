@@ -53,17 +53,17 @@ from pyspark.sql import functions as F
 )
 @dlt.expect_or_drop("has_customer", "customer_sk IS NOT NULL")
 def gold_customer_360():
-    cust = dlt.read("silver_customer")
+    cust = dlt.read("silver.silver_customer")
 
     contracts = (
-        dlt.read("silver_contract").groupBy("customer_sk").agg(
+        dlt.read("silver.silver_contract").groupBy("customer_sk").agg(
             F.count("*").alias("contract_count"),
             F.sum("contract_amount").alias("total_contract_amount"),
             F.max("start_date").alias("latest_contract_date"),
         )
     )
     invoices = (
-        dlt.read("silver_invoice").groupBy("customer_sk").agg(
+        dlt.read("silver.silver_invoice").groupBy("customer_sk").agg(
             F.count("*").alias("invoice_count"),
             F.sum("gross_amount").alias("total_invoiced"),
             F.sum("amount_paid").alias("total_paid"),
@@ -73,14 +73,14 @@ def gold_customer_360():
         )
     )
     cases = (
-        dlt.read("silver_case").groupBy("customer_sk").agg(
+        dlt.read("silver.silver_case").groupBy("customer_sk").agg(
             F.count("*").alias("case_count"),
             F.sum(F.col("is_open").cast("int")).alias("open_case_count"),
             F.avg("resolution_hours").alias("avg_resolution_hours"),
         )
     )
     acts = (
-        dlt.read("silver_activity").groupBy("customer_sk").agg(
+        dlt.read("silver.silver_activity").groupBy("customer_sk").agg(
             F.count("*").alias("activity_count"),
             F.max("activity_date").alias("last_activity_date"),
         )

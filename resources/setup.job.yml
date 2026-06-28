@@ -20,9 +20,6 @@ resources:
         environment: ${bundle.target}
         domain: governance
 
-      email_notifications:
-        on_failure:
-          - ${var.notifications_email}
 
       # Serverless SQL-notebook tasks; the catalog widget is passed per task.
       parameters:
@@ -55,6 +52,9 @@ resources:
             notebook_path: ../notebooks/setup/02_masking_row_filters.sql
             base_parameters:
               catalog: ${var.catalog}
+              # env drives the prod-strict guard (gold.is_prod): masks + row
+              # filters enforce strictly in prod, relax on synthetic dev/qa data.
+              env: ${bundle.target}
 
       queue:
         enabled: true

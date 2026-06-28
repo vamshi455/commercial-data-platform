@@ -19,13 +19,18 @@ USE SCHEMA gold;
 
 -- ---------------------------------------------------------------------------
 -- territory_filter — TRUE if caller may see the row's territory.
+--   Depends on gold.is_prod() (defined in masking_functions.sql, which runs
+--   first). In non-prod the filter is relaxed to all rows so engineers can test
+--   against the full synthetic dataset; row scoping is enforced only in prod.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gold.territory_filter(territory STRING)
   RETURNS BOOLEAN
-  COMMENT 'Row filter: unrestricted for finance/stewards/platform; sales_analysts see only mapped territories.'
+  COMMENT 'Row filter: unrestricted for finance/stewards/platform; sales_analysts see only mapped territories. Relaxed (all rows) in non-prod.'
   RETURN
+    -- Non-prod: synthetic data, no row scoping (see gold.is_prod()).
+    NOT gold.is_prod()
     -- Unrestricted personas: full visibility across all territories.
-    is_account_group_member('cdp_data_stewards')
+    OR is_account_group_member('cdp_data_stewards')
     OR is_account_group_member('cdp_platform_engineers')
     OR is_account_group_member('cdp_finance_analysts')
     OR is_account_group_member('cdp_analytics_engineers')

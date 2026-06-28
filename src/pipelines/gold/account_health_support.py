@@ -41,7 +41,7 @@ from pyspark.sql import functions as F
 @dlt.expect_or_drop("has_customer", "customer_sk IS NOT NULL")
 def gold_support_performance():
     return (
-        dlt.read("silver_case")
+        dlt.read("silver.silver_case")
         .groupBy("customer_sk")
         .agg(
             F.count("*").alias("case_count"),
@@ -66,13 +66,13 @@ def gold_support_performance():
 )
 @dlt.expect_or_drop("has_customer", "customer_sk IS NOT NULL")
 def gold_account_health():
-    cust = dlt.read("silver_customer").select("customer_sk", "company_name", "country")
+    cust = dlt.read("silver.silver_customer").select("customer_sk", "company_name", "country")
     support = dlt.read("gold_support_performance").select(
         "customer_sk", "open_case_count", "high_priority_case_count", "avg_resolution_hours")
     collections = dlt.read("gold_collections_risk").select(
         "customer_sk", "risk_tier", "total_open_ar")
     engagement = (
-        dlt.read("silver_activity").groupBy("customer_sk").agg(
+        dlt.read("silver.silver_activity").groupBy("customer_sk").agg(
             F.max("activity_date").alias("last_activity_date"),
             F.count("*").alias("activity_count"),
         )
@@ -122,7 +122,7 @@ def gold_account_health():
 )
 @dlt.expect("has_contract", "contract_id IS NOT NULL")
 def gold_renewal_risk():
-    contracts = dlt.read("silver_contract").where("end_date IS NOT NULL")
+    contracts = dlt.read("silver.silver_contract").where("end_date IS NOT NULL")
     health = dlt.read("gold_account_health").select(
         "customer_sk", "health_tier", "health_score")
 

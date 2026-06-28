@@ -2,7 +2,7 @@
 
 This document explains how the Commercial Data Platform is built, validated, and promoted
 through **dev → qa → prod** using **Databricks Asset Bundles (DABs)** and **GitHub Actions**,
-with **service-principal OAuth (M2M)** auth and approval gates.
+with **Workload Identity Federation (WIF / GitHub OIDC, secret-less)** auth and approval gates.
 
 > **One bundle, three targets.** The *same* code deploys to every environment; only config
 > (catalog, schedules, permissions, compute, channel) changes per target. Root config:
@@ -91,40 +91,74 @@ databricks bundle destroy -t dev
 
 ---
 
-## 4. Service principal + OAuth (M2M) auth for CI
+## 4. Workload Identity Federation (WIF) auth for CI
 
-CI never uses a human user. It authenticates as a **Unity Catalog service principal** via
-**OAuth machine-to-machine (client credentials)**.
+CI never uses a human user — and, as of this platform, **never stores a Databricks
+secret**. Databricks recommends **Workload Identity Federation (WIF)** for CI/CD
+authentication. WIF eliminates the need for Databricks secrets, which makes it the
+most secure way to authenticate automated flows to Databricks. See
+[Enable workload identity federation in CI/CD](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-federation).
+
+CI authenticates as a **Unity Catalog service principal** by exchanging the
+**GitHub-issued OIDC token** for a short-lived Databricks token — no client secret
+ever exists.
 
 ```
-GitHub Actions runner
-   │  env: DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET
+GitHub Actions job  (permissions: id-token: write)
+   │  mints a GitHub OIDC token (issuer https://token.actions.githubusercontent.com)
+   │  env: DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_AUTH_TYPE=github-oidc
    ▼
-databricks CLI  ──OAuth client_credentials──►  Databricks token endpoint
-   │                                              (issues short-lived OAuth token)
+databricks CLI  ──OIDC token──►  Databricks OIDC token endpoint
+   │                               (federation policy validates issuer + subject,
+   │                                issues a short-lived Databricks token)
    ▼
-Workspace + Unity Catalog (deploy/run as service principal)
+Workspace + Unity Catalog (deploy/run as the service principal)
 ```
 
-- The CLI auto-detects OAuth M2M when `DATABRICKS_CLIENT_ID` + `DATABRICKS_CLIENT_SECRET` (+
-  `DATABRICKS_HOST`) are present — **no PAT needed**. (A PAT via `DATABRICKS_TOKEN` is a
-  fallback but discouraged.)
-- The service principal must have: workspace access, `CAN_MANAGE` on the bundle root path,
-  and UC privileges (`USE CATALOG`, `CREATE SCHEMA/TABLE`, pipeline create) on the target
-  catalog. In `databricks.yml`, qa/prod set `run_as.service_principal_name:
+- **No secret to leak or rotate.** `DATABRICKS_HOST` (workspace URL) and
+  `DATABRICKS_CLIENT_ID` (the SP application id) are **non-secret identifiers**,
+  stored as GitHub **variables** (`vars.*`), not secrets. There is no
+  `DATABRICKS_CLIENT_SECRET` anywhere.
+- `permissions: id-token: write` on the job is what lets it request the GitHub OIDC
+  token; `DATABRICKS_AUTH_TYPE: github-oidc` pins the CLI to this flow so a
+  misconfiguration fails loudly instead of silently falling back.
+- The service principal must have: workspace access, `CAN_MANAGE` on the bundle root
+  path, and UC privileges (`USE CATALOG`, `CREATE SCHEMA/TABLE`, pipeline create) on
+  the target catalog. In `databricks.yml`, qa/prod set `run_as.service_principal_name:
   ${var.deploy_service_principal}`.
 
-### 4.1 Secrets & GitHub Environments
+### 4.1 One-time setup — federation policy + GitHub variables
 
-| Secret | Scope | Purpose |
+**On Databricks (per service principal, account-level):** create a federation policy
+that trusts this repo's GitHub OIDC tokens. The `subject` claim scopes trust to a
+specific repo + environment so only the right workflow can assume the SP:
+
+```bash
+# Trust the prod SP only from this repo's `prod` environment.
+databricks account service-principal-federation-policies create \
+  --service-principal-id <PROD_SP_NUMERIC_ID> --json '{
+    "oidc_policy": {
+      "issuer":   "https://token.actions.githubusercontent.com",
+      "audiences": ["https://github.com/<ORG>"],
+      "subject":  "repo:<ORG>/<REPO>:environment:prod"
+    }
+  }'
+```
+
+Repeat for the QA SP with `subject: "repo:<ORG>/<REPO>:environment:qa"`, and for the
+CI/dev SP with a PR-appropriate subject (e.g. `repo:<ORG>/<REPO>:pull_request`).
+
+**On GitHub:** store the non-secret identifiers as **variables** (not secrets).
+
+| GitHub **variable** | Scope | Purpose |
 |---|---|---|
-| `DATABRICKS_HOST` | repo or environment | Workspace URL `https://dbc-0d3c2f0f-de7b.cloud.databricks.com` |
-| `DATABRICKS_CLIENT_ID` | **environment** (`qa`, `prod`) | OAuth SP client id |
-| `DATABRICKS_CLIENT_SECRET` | **environment** (`qa`, `prod`) | OAuth SP secret |
-| `DEPLOY_SERVICE_PRINCIPAL` | environment | SP application id for `run_as` var |
+| `DATABRICKS_HOST` | repo or environment | Workspace URL `https://adb-7405618019865738.18.azuredatabricks.net` |
+| `DATABRICKS_CLIENT_ID` | **environment** (`qa`, `prod`) | SP application (client) id |
+| `DEPLOY_SERVICE_PRINCIPAL` | environment | SP application id for the `run_as` bundle var |
 
-Store qa and prod credentials in **GitHub Environments** (`qa`, `prod`) so the **prod**
-environment can require **manual approval** + restrict which branches/tags can deploy.
+Scope `DATABRICKS_CLIENT_ID` / `DEPLOY_SERVICE_PRINCIPAL` to **GitHub Environments**
+(`qa`, `prod`) so the **prod** environment can require **manual approval** and restrict
+which branches/tags deploy. No `Settings → Secrets` entries are needed at all.
 
 ---
 
@@ -143,11 +177,13 @@ on:
 jobs:
   validate-and-test:
     runs-on: ubuntu-latest
-    environment: dev            # uses dev/non-prod SP secrets
+    permissions:
+      id-token: write           # mint GitHub OIDC token for WIF
+      contents: read
     env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_AUTH_TYPE: github-oidc
     steps:
       - uses: actions/checkout@v4
       - uses: databricks/setup-cli@main
@@ -177,11 +213,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'develop' && 'dev' || 'qa' }}
+    permissions:
+      id-token: write           # mint GitHub OIDC token for WIF
+      contents: read
     env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
-      BUNDLE_VAR_deploy_service_principal: ${{ secrets.DEPLOY_SERVICE_PRINCIPAL }}
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      BUNDLE_VAR_deploy_service_principal: ${{ vars.DEPLOY_SERVICE_PRINCIPAL }}
     steps:
       - uses: actions/checkout@v4
       - uses: databricks/setup-cli@main
@@ -202,11 +241,14 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     environment: prod           # <-- required reviewers (approval gate) configured here
+    permissions:
+      id-token: write           # mint GitHub OIDC token for WIF
+      contents: read
     env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
-      BUNDLE_VAR_deploy_service_principal: ${{ secrets.DEPLOY_SERVICE_PRINCIPAL }}
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      BUNDLE_VAR_deploy_service_principal: ${{ vars.DEPLOY_SERVICE_PRINCIPAL }}
     steps:
       - uses: actions/checkout@v4
       - uses: databricks/setup-cli@main
@@ -261,11 +303,14 @@ A change cannot reach the next environment until **all** pass:
 
 ```
 1.  Install CLI:            (Databricks CLI v0.2xx+; `databricks -v`)
-2.  Create SP + OAuth secret in the account console; grant UC + workspace privileges.
-3.  Add GitHub repo/env secrets:
-       DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET, DEPLOY_SERVICE_PRINCIPAL
+2.  Create the SP in the account console; grant UC + workspace privileges.
+       Then add a WIF *federation policy* on the SP trusting this repo's GitHub
+       OIDC subject (issuer token.actions.githubusercontent.com) — see §4.1.
+       NO OAuth secret is created.
+3.  Add GitHub repo/env *variables* (not secrets):
+       DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DEPLOY_SERVICE_PRINCIPAL
        (qa & prod in GitHub Environments; configure required reviewers on `prod`).
-4.  Local auth (one-time):  databricks auth login --host https://dbc-0d3c2f0f-de7b.cloud.databricks.com
+4.  Local auth (one-time):  databricks auth login --host https://adb-7405618019865738.18.azuredatabricks.net
 5.  Validate:               databricks bundle validate -t dev
 6.  Deploy dev:             databricks bundle deploy   -t dev
 7.  Seed landing data:      run data_gen / scripts to land files in /Volumes/cdp_dev/landing/files

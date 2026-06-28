@@ -22,13 +22,26 @@ USE CATALOG ${catalog};
 USE SCHEMA gold;
 
 -- ---------------------------------------------------------------------------
+-- 0. is_prod — environment guard. Every mask/row-filter short-circuits on this:
+--    STRICT in prod, RELAXED on synthetic dev/qa data so engineers can iterate.
+--    The deploy target ${env} is baked in as a literal at create time — a mask
+--    UDF body cannot read session params, so the guard can't be flipped at query
+--    time. Make qa strict by changing the predicate to ${env} IN ('qa','prod').
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION gold.is_prod()
+  RETURNS BOOLEAN
+  COMMENT 'Environment guard: TRUE only in prod (baked from the bundle target). Masks/row-filters enforce when TRUE, relax otherwise.'
+  RETURN '${env}' = 'prod';
+
+-- ---------------------------------------------------------------------------
 -- 1. mask_email — keep domain, redact local part. Clear for stewards/platform.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
   RETURNS STRING
-  COMMENT 'Column mask: redacts the local part of an email unless caller is a privileged group.'
+  COMMENT 'Column mask: redacts the local part of an email unless caller is a privileged group. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN email          -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_customer_success')
@@ -42,9 +55,10 @@ CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
   RETURNS STRING
-  COMMENT 'Column mask: shows only the last 4 digits of a phone number for non-privileged callers.'
+  COMMENT 'Column mask: shows only the last 4 digits of a phone number for non-privileged callers. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN phone          -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_customer_success')
@@ -58,9 +72,10 @@ CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
   RETURNS STRING
-  COMMENT 'Column mask: financial_sensitive — shows last 4 of a tax/EIN/SSN; full for finance & stewards.'
+  COMMENT 'Column mask: financial_sensitive — shows last 4 of a tax/EIN/SSN; full for finance & stewards. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN tax_id         -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_finance_analysts')
@@ -76,9 +91,10 @@ CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
 -- PII; only data_stewards (and platform engineers) may read them in the clear.
 CREATE OR REPLACE FUNCTION gold.mask_free_text(txt STRING)
   RETURNS STRING
-  COMMENT 'Column mask: restricted_free_text — redacts unstructured notes unless caller is a steward/platform.'
+  COMMENT 'Column mask: restricted_free_text — redacts unstructured notes unless caller is a steward/platform. Relaxed in non-prod.'
   RETURN
     CASE
+      WHEN NOT gold.is_prod() THEN txt            -- dev/qa: synthetic data, unmasked
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
       THEN txt

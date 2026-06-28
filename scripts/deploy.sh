@@ -58,7 +58,7 @@ fi
 if [[ "${TARGET}" == "prod" && "${ASSUME_YES}" != "true" ]]; then
   echo "============================================================"
   echo "  You are about to DEPLOY TO PRODUCTION (cdp_prod)."
-  echo "  Workspace: https://dbc-0d3c2f0f-de7b.cloud.databricks.com"
+  echo "  Workspace: https://adb-7405618019865738.18.azuredatabricks.net"
   echo "============================================================"
   read -r -p "Type 'deploy-prod' to continue: " CONFIRM
   if [[ "${CONFIRM}" != "deploy-prod" ]]; then
