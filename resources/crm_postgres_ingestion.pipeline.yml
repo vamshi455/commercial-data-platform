@@ -1,0 +1,38 @@
+# =============================================================================
+# resources/crm_postgres_ingestion.pipeline.yml
+# -----------------------------------------------------------------------------
+# On-demand Lakeflow (DLT) pipeline that pulls the CRM data model from a LOCAL
+# PostgreSQL over the ngrok tunnel (JDBC) and lands one bronze table per entity
+# (bronze.crm_pg_*). Side-by-side with the file-based crm_ingestion pipeline.
+#
+# Trigger it with scripts/pull_crm_from_pg.sh, which auto-detects the live ngrok
+# endpoint and injects host/port via `bundle deploy --var` (the endpoint changes
+# each ngrok restart). The reader password is read from a Databricks secret scope.
+# NOT scheduled — run when you want fresh CRM data in bronze.
+# =============================================================================
+resources:
+  pipelines:
+    crm_postgres_ingestion:
+      name: "[${bundle.target}] cdp_crm_postgres_ingestion"
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      channel: ${var.pipeline_channel}
+      development: ${var.pipeline_development}
+      continuous: false
+      photon: true
+      libraries:
+        - file:
+            path: ../src/pipelines/ingestion/crm_postgres_jdbc.py
+      configuration:
+        cdp.catalog: ${var.catalog}
+        # Postgres connection — host/port are run-time vars (ngrok endpoint changes);
+        # password is resolved from a Databricks secret scope, never stored here.
+        cdp.pg_host: ${var.pg_host}
+        cdp.pg_port: ${var.pg_port}
+        cdp.pg_db: ${var.pg_db}
+        cdp.pg_user: ${var.pg_user}
+        # password is fetched in-code via dbutils.secrets.get (DLT config does not
+        # resolve {{secrets/...}}); these just name where to find it.
+        cdp.pg_secret_scope: cdp
+        cdp.pg_secret_key: pg_reader_password

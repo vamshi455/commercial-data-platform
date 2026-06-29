@@ -38,6 +38,19 @@ variables:
       Service principal application ID used to run QA/PROD jobs and pipelines.
       Set per-target in CI via --var or DATABRICKS_BUNDLE_VAR_deploy_service_principal.
     default: ""
+  # ---- Postgres CRM source (on-demand JDBC ingestion over the ngrok tunnel) ----
+  pg_host:
+    description: Postgres host for CRM JDBC ingestion (the ngrok tunnel host). Injected at run time by scripts/pull_crm_from_pg.sh.
+    default: ""
+  pg_port:
+    description: Postgres port (the ngrok tunnel port). Injected at run time.
+    default: "5432"
+  pg_db:
+    description: Postgres database holding the CRM source.
+    default: cdp_crm
+  pg_user:
+    description: Read-only Postgres user Databricks connects as.
+    default: databricks_reader
 
 # Resource definitions (jobs + pipelines) live in resources/*.yml and are
 # included here so they can reference ${var.*} and ${bundle.target}.
@@ -72,12 +85,14 @@ targets:
       catalog: cdp_qa
       landing_volume: /Volumes/cdp_qa/landing/files
       pipeline_channel: CURRENT
-    # Service principal recommended for QA/PROD (set in CI secrets, not here).
+    # TEMP WORKAROUND (no service principal / cdp_* groups yet — account-admin
+    # blocked): run qa as the deploying user and drop the group permission so a
+    # MANUAL deploy works. REVERT to the SP run_as + group grant once they exist.
     run_as:
-      service_principal_name: ${var.deploy_service_principal}
-    permissions:
-      - level: CAN_VIEW
-        group_name: cdp_analytics_engineers
+      user_name: vsingam@mhktechinc.com
+    # permissions:
+    #   - level: CAN_VIEW
+    #     group_name: cdp_analytics_engineers
 
   # ---- PROD: controlled execution, restricted access, real schedules ----
   prod:
