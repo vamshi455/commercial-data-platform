@@ -25,21 +25,18 @@ resources:
 
 
       tasks:
-        # 1) CRM ingestion -> bronze
-        - task_key: crm_ingestion
-          pipeline_task:
-            pipeline_id: ${resources.pipelines.crm_ingestion.id}
-            full_refresh: false
+        # NOTE: CRM bronze is now sourced from local Postgres ON-DEMAND via the
+        # crm_postgres_ingestion pipeline (scripts/pull_crm_from_pg.sh), NOT this
+        # job. This daily job covers ERP + reference (file-based) -> transformation;
+        # bronze_crm_* must be refreshed via the Postgres pull independently.
 
-        # 2) ERP + reference ingestion -> bronze (after CRM)
+        # 1) ERP + reference ingestion -> bronze
         - task_key: erp_ingestion
-          depends_on:
-            - task_key: crm_ingestion
           pipeline_task:
             pipeline_id: ${resources.pipelines.erp_ingestion.id}
             full_refresh: false
 
-        # 3) Silver + gold transformation (after both ingests)
+        # 2) Silver + gold transformation (reads bronze_crm_* [Postgres] + bronze_erp_*/ref_*)
         - task_key: transformation
           depends_on:
             - task_key: erp_ingestion

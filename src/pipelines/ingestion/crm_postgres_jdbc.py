@@ -1,10 +1,9 @@
 """CRM ingestion from local PostgreSQL (over the ngrok tunnel) -> bronze.
 
-Reads each ``crm.*`` table via Postgres JDBC and materialises a bronze table per
-entity: ``bronze.crm_pg_<entity>``. This is the **Postgres-sourced** path; it runs
-*side-by-side* with the file-based ``crm_autoloader`` (which writes
-``bronze_crm_*``) so nothing existing is replaced. Once validated, you can promote
-this to be the canonical CRM bronze and retire the file path.
+Reads each ``crm.*`` table via Postgres JDBC and materialises one bronze table per
+entity: ``bronze.bronze_crm_<entity>``. This is the **canonical** CRM bronze source
+— it REPLACED the file-based ``crm_autoloader`` (retired). Silver reads these
+tables directly. ERP and reference data are still file-based.
 
 ON-DEMAND by design:
   * Connection ``host``/``port`` are RUN-TIME vars (``cdp.pg_host`` / ``cdp.pg_port``)
@@ -56,7 +55,7 @@ def _read(table: str):
 
 def _make(entity: str):
     @dlt.table(
-        name=f"crm_pg_{entity}",
+        name=f"bronze_crm_{entity}",
         comment=f"Bronze CRM {entity} pulled from local Postgres crm.{entity} via JDBC/tunnel (on-demand).",
         table_properties={"quality": "bronze", "cdp.source": "postgres_jdbc"},
     )

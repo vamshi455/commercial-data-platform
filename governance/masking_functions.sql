@@ -4,44 +4,40 @@
 -- Column-mask UDFs + ALTER COLUMN ... SET MASK bindings for PII/sensitive
 -- fields across silver and gold. Run once per environment (USE CATALOG ${catalog}).
 --
--- HOW MASKING WORKS
---   A column mask is a SQL UDF whose FIRST argument is the column value. When
---   bound via ALTER TABLE ... ALTER COLUMN col SET MASK fn, UC calls the UDF on
---   every read and substitutes its return value. The UDF uses
---   is_account_group_member('<group>') to let privileged groups (data_stewards,
---   platform_engineers, plus role-appropriate groups) see clear text while
---   everyone else gets a redacted value.
+-- ⚠️ RECONCILED 2026-06-29. Two parts:
+--   PART A — UDF definitions. Independent objects; SAFE TO APPLY NOW.
+--   PART B — mask BINDINGS. Target the PII columns promoted into silver/gold by
+--            the pipeline (Track A). Apply ONLY AFTER those columns exist
+--            (silver.silver_contact.work_email/mobile_phone; gold.gold_customer_360
+--            .primary_email/primary_phone/tax_id). Until then they ERROR (no column).
 --
--- PRIVILEGES
---   Functions are created in the gold schema and reused by silver/gold tables.
---   Personas that read masked tables need EXECUTE on these functions (granted
---   at schema level in grants.sql).
+-- HOW MASKING WORKS: a column mask is a SQL UDF whose first arg is the column
+--   value; bound via ALTER COLUMN ... SET MASK, UC calls it on every read.
+--   is_account_group_member('<group>') lets privileged groups see clear text.
 -- =============================================================================
 
 USE CATALOG ${catalog};
 USE SCHEMA gold;
 
--- ---------------------------------------------------------------------------
--- 0. is_prod — environment guard. Every mask/row-filter short-circuits on this:
---    STRICT in prod, RELAXED on synthetic dev/qa data so engineers can iterate.
---    The deploy target ${env} is baked in as a literal at create time — a mask
---    UDF body cannot read session params, so the guard can't be flipped at query
---    time. Make qa strict by changing the predicate to ${env} IN ('qa','prod').
--- ---------------------------------------------------------------------------
+-- ###########################################################################
+-- PART A — UDF DEFINITIONS  (safe to apply now)
+-- ###########################################################################
+
+-- is_prod — environment guard. Masks short-circuit on this: STRICT in prod,
+-- RELAXED on synthetic dev/qa data. ${env} is baked in at create time.
+-- (To test masking in dev, deploy with env='prod' semantics or change predicate.)
 CREATE OR REPLACE FUNCTION gold.is_prod()
   RETURNS BOOLEAN
-  COMMENT 'Environment guard: TRUE only in prod (baked from the bundle target). Masks/row-filters enforce when TRUE, relax otherwise.'
+  COMMENT 'Environment guard: TRUE only in prod (baked from bundle target). Masks/row-filters enforce when TRUE, relax otherwise.'
   RETURN '${env}' = 'prod';
 
--- ---------------------------------------------------------------------------
--- 1. mask_email — keep domain, redact local part. Clear for stewards/platform.
--- ---------------------------------------------------------------------------
+-- mask_email — keep domain, redact local part. Clear for stewards/platform/CS.
 CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
   RETURNS STRING
-  COMMENT 'Column mask: redacts the local part of an email unless caller is a privileged group. Relaxed in non-prod.'
+  COMMENT 'Column mask (pii): redacts local part of an email unless caller is steward/platform/customer_success. Relaxed in non-prod.'
   RETURN
     CASE
-      WHEN NOT gold.is_prod() THEN email          -- dev/qa: synthetic data, unmasked
+      WHEN NOT gold.is_prod() THEN email
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_customer_success')
@@ -50,15 +46,13 @@ CREATE OR REPLACE FUNCTION gold.mask_email(email STRING)
       ELSE concat('****@', split_part(email, '@', 2))
     END;
 
--- ---------------------------------------------------------------------------
--- 2. mask_phone — keep last 4 digits, redact the rest.
--- ---------------------------------------------------------------------------
+-- mask_phone — keep last 4 digits. Clear for stewards/platform/CS.
 CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
   RETURNS STRING
-  COMMENT 'Column mask: shows only the last 4 digits of a phone number for non-privileged callers. Relaxed in non-prod.'
+  COMMENT 'Column mask (pii): shows only last 4 digits for non-privileged callers, clear for steward/platform/customer_success. Relaxed in non-prod.'
   RETURN
     CASE
-      WHEN NOT gold.is_prod() THEN phone          -- dev/qa: synthetic data, unmasked
+      WHEN NOT gold.is_prod() THEN phone
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_customer_success')
@@ -67,15 +61,13 @@ CREATE OR REPLACE FUNCTION gold.mask_phone(phone STRING)
       ELSE concat('***-***-', right(regexp_replace(phone, '[^0-9]', ''), 4))
     END;
 
--- ---------------------------------------------------------------------------
--- 3. mask_tax_id — show only last 4. Finance + stewards see full.
--- ---------------------------------------------------------------------------
+-- mask_tax_id — show only last 4. Clear for finance + stewards/platform.
 CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
   RETURNS STRING
-  COMMENT 'Column mask: financial_sensitive — shows last 4 of a tax/EIN/SSN; full for finance & stewards. Relaxed in non-prod.'
+  COMMENT 'Column mask (financial_sensitive): shows last 4 of a tax/EIN, full for finance & stewards/platform. Relaxed in non-prod.'
   RETURN
     CASE
-      WHEN NOT gold.is_prod() THEN tax_id         -- dev/qa: synthetic data, unmasked
+      WHEN NOT gold.is_prod() THEN tax_id
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
         OR is_account_group_member('cdp_finance_analysts')
@@ -84,17 +76,14 @@ CREATE OR REPLACE FUNCTION gold.mask_tax_id(tax_id STRING)
       ELSE concat('***-**-', right(tax_id, 4))
     END;
 
--- ---------------------------------------------------------------------------
--- 4. mask_free_text — fully redact restricted free text for non-stewards.
--- ---------------------------------------------------------------------------
--- Free-text fields (support notes, account comments) may contain unstructured
--- PII; only data_stewards (and platform engineers) may read them in the clear.
+-- mask_free_text — fully redact restricted free text for non-stewards.
+-- (No free-text columns are bound in the current model; kept for future notes fields.)
 CREATE OR REPLACE FUNCTION gold.mask_free_text(txt STRING)
   RETURNS STRING
-  COMMENT 'Column mask: restricted_free_text — redacts unstructured notes unless caller is a steward/platform. Relaxed in non-prod.'
+  COMMENT 'Column mask (restricted_free_text): redacts unstructured notes unless steward/platform. Relaxed in non-prod.'
   RETURN
     CASE
-      WHEN NOT gold.is_prod() THEN txt            -- dev/qa: synthetic data, unmasked
+      WHEN NOT gold.is_prod() THEN txt
       WHEN is_account_group_member('cdp_data_stewards')
         OR is_account_group_member('cdp_platform_engineers')
       THEN txt
@@ -102,24 +91,19 @@ CREATE OR REPLACE FUNCTION gold.mask_free_text(txt STRING)
       ELSE '[REDACTED]'
     END;
 
--- ===========================================================================
--- BIND MASKS — ALTER COLUMN ... SET MASK examples
--- ---------------------------------------------------------------------------
--- silver layer (source-of-truth entities)
--- ---------------------------------------------------------------------------
-ALTER TABLE silver.crm_contacts  ALTER COLUMN email    SET MASK gold.mask_email;
-ALTER TABLE silver.crm_contacts  ALTER COLUMN phone    SET MASK gold.mask_phone;
-ALTER TABLE silver.crm_accounts  ALTER COLUMN tax_id   SET MASK gold.mask_tax_id;
-ALTER TABLE silver.erp_invoices  ALTER COLUMN tax_id   SET MASK gold.mask_tax_id;
+-- ###########################################################################
+-- PART B — MASK BINDINGS  (apply ONLY AFTER the pipeline promotes these columns)
+-- ###########################################################################
+-- SILVER — conformed contact entity (added by the silver pipeline; Track A).
+-- ALTER TABLE silver.silver_contact ALTER COLUMN work_email   SET MASK gold.mask_email;
+-- ALTER TABLE silver.silver_contact ALTER COLUMN mobile_phone SET MASK gold.mask_phone;
 
--- ---------------------------------------------------------------------------
--- gold layer (serving marts)
--- ---------------------------------------------------------------------------
-ALTER TABLE gold.customer_360 ALTER COLUMN primary_email SET MASK gold.mask_email;
-ALTER TABLE gold.customer_360 ALTER COLUMN primary_phone SET MASK gold.mask_phone;
-ALTER TABLE gold.customer_360 ALTER COLUMN tax_id        SET MASK gold.mask_tax_id;
-ALTER TABLE gold.support_performance ALTER COLUMN last_case_notes SET MASK gold.mask_free_text;
-ALTER TABLE gold.account_health      ALTER COLUMN steward_notes   SET MASK gold.mask_free_text;
+-- GOLD — customer_360 carries the minimal action-need PII (email/phone for
+-- outreach, tax_id for finance). NOTE: gold.gold_customer_360 is a DLT
+-- materialized view; SET MASK on it must be declared in the pipeline (the MV
+-- definition) so a full refresh does not drop the binding.
+-- ALTER TABLE gold.gold_customer_360 ALTER COLUMN primary_email SET MASK gold.mask_email;
+-- ALTER TABLE gold.gold_customer_360 ALTER COLUMN primary_phone SET MASK gold.mask_phone;
+-- ALTER TABLE gold.gold_customer_360 ALTER COLUMN tax_id        SET MASK gold.mask_tax_id;
 
--- To remove a mask (e.g. when refactoring a column):
---   ALTER TABLE gold.customer_360 ALTER COLUMN primary_email DROP MASK;
+-- To remove a mask: ALTER TABLE ... ALTER COLUMN col DROP MASK;
