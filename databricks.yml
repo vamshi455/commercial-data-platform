@@ -51,6 +51,16 @@ variables:
   pg_user:
     description: Read-only Postgres user Databricks connects as.
     default: databricks_reader
+  # ---- contract_vector_search module (see docs/specs/contract-vector-search.md) ----
+  contracts_schema:
+    description: Schema holding contract docs / chunks (module = contract_vector_search).
+    default: contracts
+  vs_endpoint:
+    description: >-
+      Mosaic AI Vector Search endpoint (STANDARD) for the contract index. NOTE:
+      a VS endpoint is an always-on billed resource — one per environment that
+      needs it. Only dev is provisioned today.
+    default: cdp_contracts_vs
 
 # Resource definitions (jobs + pipelines) live in resources/*.yml and are
 # included here so they can reference ${var.*} and ${bundle.target}.

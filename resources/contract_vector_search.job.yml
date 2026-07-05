@@ -1,0 +1,92 @@
+# =============================================================================
+# resources/contract_vector_search.job.yml
+# -----------------------------------------------------------------------------
+# Additive module (does NOT touch existing pipelines/jobs). One serverless Job:
+#   00_ddl -> 01_bronze_ingest -> 02_silver_parse_chunk -> 03_gold_merge -> 04_index_sync
+# Incremental + idempotent end to end. TRIGGERED index sync (no always-on).
+#
+# Backfill == just run the job: the empty Auto Loader checkpoint drains all
+# existing files on the first run; later runs pick up only new ones.
+#
+# Run on demand:  databricks bundle run job_contract_vector_search -t dev
+# Or let the file-arrival trigger fire when a new PDF lands in the raw volume.
+# =============================================================================
+resources:
+  jobs:
+    job_contract_vector_search:
+      name: "[${bundle.target}] job_contract_vector_search"
+
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: contracts
+
+      # Job parameters (defaults from bundle vars); passed to each task widget.
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.contracts_schema}
+        - name: vs_endpoint
+          default: ${var.vs_endpoint}
+
+      # Serverless env for tasks that need the Vector Search / LangChain SDKs.
+      environments:
+        - environment_key: vs_env
+          spec:
+            client: "2"
+            dependencies:
+              - databricks-vectorsearch
+              - databricks-langchain
+
+      # Fire when a new contract PDF lands (no polling compute).
+      trigger:
+        file_arrival:
+          url: /Volumes/${var.catalog}/${var.contracts_schema}/raw_contract_files/
+
+      tasks:
+        - task_key: ddl
+          notebook_task:
+            notebook_path: ../ddl/contract_vector_search.sql
+            base_parameters:
+              catalog: ${var.catalog}
+
+        - task_key: bronze_ingest
+          depends_on: [{ task_key: ddl }]
+          notebook_task:
+            notebook_path: ../src/contract_vector_search/01_bronze_ingest.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.contracts_schema}
+              vs_endpoint: ${var.vs_endpoint}
+
+        - task_key: silver_parse_chunk
+          depends_on: [{ task_key: bronze_ingest }]
+          notebook_task:
+            notebook_path: ../src/contract_vector_search/02_silver_parse_chunk.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.contracts_schema}
+              vs_endpoint: ${var.vs_endpoint}
+
+        - task_key: gold_merge
+          depends_on: [{ task_key: silver_parse_chunk }]
+          notebook_task:
+            notebook_path: ../src/contract_vector_search/03_gold_merge.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.contracts_schema}
+              vs_endpoint: ${var.vs_endpoint}
+
+        - task_key: index_sync
+          depends_on: [{ task_key: gold_merge }]
+          environment_key: vs_env
+          notebook_task:
+            notebook_path: ../src/contract_vector_search/04_index_sync.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.contracts_schema}
+              vs_endpoint: ${var.vs_endpoint}
+
+      queue:
+        enabled: true
