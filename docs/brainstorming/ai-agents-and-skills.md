@@ -86,7 +86,54 @@ RAG + LLM engineering; security design already written in `agents/`.
 
 ---
 
+## 3. MCP tools for agents (enterprise, sales-oriented) — ⏳ PENDING, revisit
+
+Goal: go through the full learning curve of **building and maintaining agents
+that access MCP tools**. MCP keeps the agent constant and makes each enterprise
+system a pluggable tool server.
+
+### Use cases by risk tier
+
+**Read-heavy (start here — low risk)**
+- **Account briefing / meeting-prep agent** — Calendar MCP (today's meetings) +
+  CRM MCP + Drive MCP → auto one-pager before each call. (Drive + Calendar MCP
+  already available in the session.)
+- **Pipeline / forecast Q&A agent** — a **Databricks MCP server** over gold
+  products (`revenue_pipeline`, `bookings_vs_billings`) → "what's my Q3 commit?"
+- **Contract Q&A agent** — Vector Search index as an MCP tool + Drive MCP to fetch
+  the source PDF.
+
+**Write-capable (the real maintenance learning curve)**
+- **Pipeline-hygiene agent** — CRM MCP with write scope: update stale opps, flag
+  missing close dates → auth scopes, idempotency, audit, approval-before-write.
+- **Renewal / collections outreach agent** — Databricks MCP (`collections_risk`,
+  `renewal_risk`) + Slack MCP to notify AM + Calendar MCP to book the save-call.
+- **Deal-desk / quote agent** — Databricks MCP (pricing) + contract index + Slack
+  approval flow.
+
+### Common enterprise MCP servers to wire in
+Salesforce / HubSpot (CRM), **Postgres** (server code already exists at
+`/Users/vamshi/AzureAI/mcp-servers/postgresql`), Databricks, Slack, Google
+Drive / Calendar / Gmail, Jira / Confluence, GitHub, web-fetch/search.
+
+### Recommended learning path (grounded in this stack)
+1. **Build a Databricks MCP server** exposing 2–3 read-only tools over gold views;
+   wrap in one agent. Teaches the MCP tool contract + read-only guardrails.
+2. **Register the existing Postgres MCP server** → agent reads the CRM source.
+   Teaches connecting an existing server + auth.
+3. **Add one write-capable tool** (Slack notify, or a CRM field update behind an
+   approval gate). Teaches the hard part: permissions, idempotency, audit logging,
+   human-in-the-loop.
+
+Arc = read-only → connect-existing → write-with-guardrails = full build-and-maintain curve.
+
+**Next when resumed:** spec step 1 (Databricks MCP server over gold products) into
+`docs/specs/databricks-mcp-server.md` and scaffold it.
+
+---
+
 ## Next step
 
 Graduate one use case into a spec. Candidates for `docs/specs/`:
-`contract-billing-reconciliation-agent.md`, `renewal-risk-save-agent.md`.
+`contract-billing-reconciliation-agent.md`, `renewal-risk-save-agent.md`,
+`databricks-mcp-server.md` (MCP learning path, step 1).
