@@ -4,6 +4,16 @@ Running list of parked/pending threads to pick up. Newest first.
 
 ## ⏳ PENDING
 
+### Domain pivot → industrial-equipment manufacturer — added 2026-07-04
+Retired oil & gas/trading framing; platform now mimics a **B2B industrial-equipment
+manufacturer**. Systems roadmap + what stays/changes/goes in
+[business-domain-and-systems.md](business-domain-and-systems.md).
+**Follow-ups:**
+- Reframe `contract_vector_search`: type keywords (MSA/distributor/pricing/supply/NDA/
+  warranty) + sample docs + tests (currently oil-trade types). Retire oil mentions in
+  architecture.md, observability.md, contract spec, metadata_extract.py, brainstorming.
+- Add synthetic generators + bronze ingestion for new systems, P0 first: **MES, PLM/BOM, WMS**.
+
 ### MDM / Data Catalog / Governance (Standard scope) — added 2026-07-04
 Authoritative masters for customer/product/supplier + survivorship + crosswalk +
 DQ scorecards; add missing source fields to generators/ingestion. Spec:
