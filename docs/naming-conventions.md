@@ -200,3 +200,10 @@ Unity Catalog groups follow `cdp_<persona>`.
 
 **Fully-qualified example (prod):**
 `cdp_prod.silver.crm_opportunities` → consumed into → `cdp_prod.gold.revenue_pipeline`.
+
+> ⚠️ **Known drift (tech debt, decision D2):** the *deployed* dev objects carry a
+> redundant layer prefix — `bronze.bronze_erp_customers`, `silver.silver_customer`,
+> `gold.gold_customer_360` — instead of the clean form above. The clean, redundancy-
+> free convention in this table is the **standard**; the deployed names are to be
+> renamed on the next pipeline redeploy (`@dlt.table` names + governance SQL +
+> curated views). Until then, code and docs disagree — see `docs/decisions.md`.

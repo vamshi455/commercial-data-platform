@@ -1,6 +1,6 @@
 # contract_vector_search
 
-Incremental ingestion of crude-oil contract PDFs into **Mosaic AI Vector Search**
+Incremental ingestion of sales & procurement contract PDFs into **Mosaic AI Vector Search**
 for a downstream RAG agent. Additive module — it does not modify existing
 pipelines, tables, or jobs. Spec: [`docs/specs/contract-vector-search.md`](../../docs/specs/contract-vector-search.md).
 

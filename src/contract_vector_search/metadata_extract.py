@@ -9,9 +9,9 @@ missing field just can't be filtered on).
 
 Filename convention observed in the landing volume, e.g.::
 
-    01_Spot_Purchase_CD-2025-0142.pdf   -> id CD-2025-0142, type "Spot Purchase"
-    02_Term_PSA_CD-2025-0197.pdf        -> id CD-2025-0197, type "Term PSA"
-    03_FOB_Cargo_CF-2025-3081.pdf       -> id CF-2025-3081, type "FOB Cargo"
+    01_Master_Sales_Agreement_CD-2025-0142.pdf -> id CD-2025-0142, type "Master Sales Agreement"
+    02_Distributor_Agreement_CD-2025-0197.pdf  -> id CD-2025-0197, type "Distributor Agreement"
+    03_Supply_Agreement_CF-2025-3081.pdf       -> id CF-2025-3081, type "Supply Agreement"
 
 If the filename doesn't carry an id we fall back to scanning the text.
 """
@@ -27,14 +27,21 @@ from dataclasses import dataclass, asdict
 _ID_RE = re.compile(r"(?<![A-Z0-9])([A-Z]{2}-\d{4}-\d{3,})(?![0-9])")
 
 # Contract-type keywords -> canonical label. Checked against filename then text.
+# B2B industrial-equipment manufacturer contract taxonomy (sell-side + procurement).
 _TYPE_KEYWORDS = [
-    ("spot purchase", "Spot Purchase"),
-    ("term psa", "Term PSA"),
-    ("psa", "Purchase & Sale Agreement"),
-    ("fob", "FOB Cargo"),
-    ("exchange", "Exchange"),
-    ("multigrade", "MultiGrade Term"),
-    ("term", "Term"),
+    ("master sales agreement", "Master Sales Agreement"),
+    ("msa", "Master Sales Agreement"),
+    ("distributor", "Distributor Agreement"),
+    ("reseller", "Reseller Agreement"),
+    ("pricing agreement", "Pricing Agreement"),
+    ("pricing", "Pricing Agreement"),
+    ("supply agreement", "Supply Agreement"),
+    ("supply", "Supply Agreement"),
+    ("non-disclosure", "NDA"),
+    ("nda", "NDA"),
+    ("warranty", "Warranty / SLA"),
+    ("service level", "Warranty / SLA"),
+    ("sla", "Warranty / SLA"),
 ]
 
 # Date patterns: ISO (2025-04-01) and long form (April 1, 2025 / 1 April 2025).

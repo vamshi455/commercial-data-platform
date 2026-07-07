@@ -34,8 +34,8 @@ plus contract documents in Vector Search.
   spikes → proactive AM alerts.
 
 ### Contracts (Vector Search / RAG)
-- **Contract Q&A agent** — "Price-adjustment and force-majeure terms in the FOB
-  cargo contracts with Counterparty Y?" — direct use of the contract index.
+- **Contract Q&A agent** — "Price-adjustment and warranty terms in the distributor
+  / supply agreements with Counterparty Y?" — direct use of the contract index.
 - **Obligation & expiry agent** — "Contracts expiring in 60 days and their
   renewal/auto-renew clauses?" — contract chunks + `renewal_risk`.
 - **Contract-vs-billing reconciliation** — "Are we billing per the contracted

@@ -80,17 +80,18 @@ criteria**, and the **repo files/folders** that implement it.
 
 ## 2. Milestones
 
-| Phase | Key outputs | Status |
+| Phase | Key outputs | Status (2026-07-04, dev only) |
 |---|---|---|
-| 1 Foundation | bundle + targets, UC catalogs/schemas/volumes, groups | ☐ Not started |
-| 2 Synthetic sources | CRM/ERP/reference generators, landed files | ☐ Not started |
-| 3 Bronze ingestion | Auto Loader streaming tables + audit columns | ☐ Not started |
-| 4 Silver conformance | MDM, reconciliation, standardization, DQ | ☐ Not started |
-| 5 Gold publication | 7 data products + Iceberg + dashboards | ☐ Not started |
-| 6 Governance & ops | CI/CD, lineage, DQ/SLA, security, contracts | ☐ Not started |
-| 7 AI & agents | 5 governed agents + eval | ☐ Not started |
+| 1 Foundation | bundle + targets, UC catalogs/schemas/volumes, groups | ☑ Done (dev) |
+| 2 Synthetic sources | CRM/ERP/reference generators, landed files | ◐ ERP/ref done; CRM via Postgres (cutover half-done) |
+| 3 Bronze ingestion | Auto Loader streaming tables + audit columns | ◐ 17 tables (ERP+ref); **CRM bronze missing** |
+| 4 Silver conformance | MDM, reconciliation, standardization, DQ | ◐ 9 objects live; CRM-dependent ones stale |
+| 5 Gold publication | 7 data products + Iceberg + dashboards | ◐ 7 products + 5 curated views live; dashboards pending |
+| 6 Governance & ops | CI/CD, lineage, DQ/SLA, security, contracts | ◐ Governance applied; **ops DQ/SLA + qa/prod not deployed** |
+| 7 AI & agents | 5 governed agents + eval | ☐ Not started (curated views = groundwork) |
 
-> Update the Status column (☐ → ◐ In progress → ☑ Done) as phases complete.
+> Status legend: ☐ Not started · ◐ In progress · ☑ Done. Only **dev** is deployed;
+> qa/prod workspaces torn down 2026-07-04 (cost). Live-status detail in `docs/checkpoint.md`.
 
 ---
 

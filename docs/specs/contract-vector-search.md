@@ -15,7 +15,9 @@
 
 ## Business context
 
-Crude oil contract documents (PDFs, occasionally scanned) land in a Unity Catalog
+Industrial-equipment sales & procurement contract documents — master sales
+agreements (MSA), distributor/reseller agreements, pricing agreements, supply
+agreements, NDAs, warranty/SLA terms (PDFs, occasionally scanned) — land in a Unity Catalog
 Volume. They must be searchable via Databricks Mosaic AI Vector Search for a
 downstream RAG agent. Ingestion is fully incremental — new files processed exactly
 once, no reprocessing. Historical backfill and ongoing incremental loads share ONE

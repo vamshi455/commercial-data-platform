@@ -6,12 +6,15 @@
 # =============================================================================
 name: deploy-qa
 
+# DISABLED 2026-07-04: QA workspace was torn down (cost). Auto-deploy triggers
+# removed so this never fires against a dead target. Re-enable the push block when
+# qa is re-provisioned and the environment is designed. Manual-only for now.
 on:
-  push:
-    branches:
-      - develop
-      - "release/**"
   workflow_dispatch: {}
+  # push:
+  #   branches:
+  #     - develop
+  #     - "release/**"
 
 # Never run two QA deploys at once; let the latest finish.
 concurrency:

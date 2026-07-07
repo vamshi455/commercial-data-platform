@@ -111,9 +111,9 @@ def test_none_contract_id_ignored():
 # metadata extraction
 # --------------------------------------------------------------------------- #
 def test_contract_id_from_filename():
-    m = meta.extract_metadata("/Volumes/x/01_Spot_Purchase_CD-2025-0142.pdf", "body text")
+    m = meta.extract_metadata("/Volumes/x/01_Master_Sales_Agreement_CD-2025-0142.pdf", "body text")
     assert m.contract_id == "CD-2025-0142"
-    assert m.contract_type == "Spot Purchase"
+    assert m.contract_type == "Master Sales Agreement"
     assert m.version == 1 and m.is_current is True
 
 

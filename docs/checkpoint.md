@@ -4,6 +4,14 @@ Running list of parked/pending threads to pick up. Newest first.
 
 ## ⏳ PENDING
 
+### Project-review decisions (2026-07-04) — see [decisions.md](decisions.md)
+Answered 9 review doubts. **Done:** CI/CD qa+prod disabled, oil→manufacturing scrub,
+plan-table status refresh, docs corrected (naming drift note, CRM account fields
+marked planned). **Tracked refactors:** D2 rename deployed `<layer>.<layer>_*` tables
+to clean form (needs redeploy), D5 fix `_common.py` inlining (wheel/%run), D6 finish
+CRM cutover (top priority — critical source), D4 activate gold PII masks/ABAC per
+persona. **Open:** D7 observability scope, keep/delete idle VS endpoint, dashboards status.
+
 ### Domain pivot → industrial-equipment manufacturer — added 2026-07-04
 Retired oil & gas/trading framing; platform now mimics a **B2B industrial-equipment
 manufacturer**. Systems roadmap + what stays/changes/goes in

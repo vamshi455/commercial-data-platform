@@ -16,13 +16,16 @@
 # =============================================================================
 name: deploy-prod
 
+# DISABLED 2026-07-04: PROD workspace was torn down (cost) AND the repo now pushes
+# straight to main — leaving the push trigger would fire a prod deploy on every
+# commit against a dead target. Manual-only until prod is re-provisioned + designed.
 on:
-  push:
-    tags:
-      - "v*"
-    branches:
-      - main
   workflow_dispatch: {}
+  # push:
+  #   tags:
+  #     - "v*"
+  #   branches:
+  #     - main
 
 # Serialize prod deploys; do not cancel an in-flight production rollout.
 concurrency:
