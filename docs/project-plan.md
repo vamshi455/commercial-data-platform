@@ -76,6 +76,15 @@ criteria**, and the **repo files/folders** that implement it.
 | **Acceptance** | Agents answer sample prompts using only governed gold/silver/system tables; no bronze/PII access; queries audited |
 | **Implements** | `agents/*`, `docs/agents.md` |
 
+### Phase 8 — Unstructured / RAG (PDF & Excel → Vector Search)
+
+| | |
+|---|---|
+| **Goals** | Add a governed unstructured lane so agents can answer from documents (contracts, quote workbooks) via RAG — reusing the same landing Volume, medallion, masking, and agent guardrails |
+| **Deliverables** | binaryFile Auto Loader (`bronze_docs_raw_*`); text extraction (`bronze_docs_parsed_*`); chunk + PII-mask (`silver_doc_chunks`); Databricks Vector Search Delta Sync Index; RAG retrieval wired into an agent |
+| **Acceptance** | PDF/Excel land → chunks materialize masked; vector index returns relevant chunks filtered by `master_customer_id`; agent answers with doc+page citations; no raw file / no unmasked PII reaches the model |
+| **Implements** | `docs/rag-unstructured.md`, `src/pipelines/ingestion/unstructured_autoloader.py`, `src/pipelines/silver/document_chunking.py`, `resources/unstructured_ingestion.pipeline.yml`, `agents/*` |
+
 ---
 
 ## 2. Milestones
@@ -89,6 +98,7 @@ criteria**, and the **repo files/folders** that implement it.
 | 5 Gold publication | 7 data products + Iceberg + dashboards | ☐ Not started |
 | 6 Governance & ops | CI/CD, lineage, DQ/SLA, security, contracts | ☐ Not started |
 | 7 AI & agents | 5 governed agents + eval | ☐ Not started |
+| 8 Unstructured / RAG | PDF/Excel → chunks → Vector Search → RAG agent | ◐ Design + spike |
 
 > Update the Status column (☐ → ◐ In progress → ☑ Done) as phases complete.
 

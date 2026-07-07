@@ -1,0 +1,39 @@
+# =============================================================================
+# resources/unstructured_ingestion.pipeline.yml
+# -----------------------------------------------------------------------------
+# RAG / unstructured track (see docs/rag-unstructured.md). One Lakeflow (DLT)
+# pipeline covering the document lane end-to-end within the medallion:
+#   bronze  bronze_docs_raw_{pdf,excel}      (binaryFile Auto Loader)
+#   bronze  bronze_docs_parsed_{pdf,excel}   (text extraction)
+#   silver  silver_doc_chunks                (chunk + mask; Vector Search source)
+#
+# The Vector Search index + RAG agent retrieval are one-time workspace setup,
+# NOT DLT tables — see docs/rag-unstructured.md §6.
+# =============================================================================
+resources:
+  pipelines:
+    unstructured_ingestion:
+      name: "[${bundle.target}] cdp_unstructured_ingestion"
+      catalog: ${var.catalog}
+      schema: bronze              # silver tables self-qualify to the silver schema
+      serverless: true
+      channel: ${var.pipeline_channel}
+      development: ${var.pipeline_development}
+      continuous: false
+      photon: true
+      libraries:
+        - file:
+            path: ../src/pipelines/ingestion/unstructured_autoloader.py
+        - file:
+            path: ../src/pipelines/silver/document_chunking.py
+      configuration:
+        cdp.catalog: ${var.catalog}
+        cdp.source_root: ${workspace.file_path}
+        cdp.landing_path: ${var.landing_volume}
+        cdp.source_system: docs
+      # Extraction UDFs (Option B, portable) need these on the serverless env.
+      # The managed alternative (ai_parse_document) would remove pymupdf.
+      environment:
+        dependencies:
+          - pymupdf
+          - openpyxl
