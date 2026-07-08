@@ -133,6 +133,7 @@ Promotion to `qa` / `prod` is the **same commands with `-t qa` / `-t prod`** —
 | [docs/source-systems.md](docs/source-systems.md) | CRM + ERP entities, behaviors, PII model, data contracts |
 | [docs/data-contracts.md](docs/data-contracts.md) | Per-entity schemas, keys, SLAs, refresh cadence |
 | [docs/pipelines.md](docs/pipelines.md) | Ingestion / silver / gold pipelines, DQ rules, expectations |
+| [docs/jobs-and-pipelines.md](docs/jobs-and-pipelines.md) | Deployed jobs & pipelines: tasks, DAGs, triggers, compute, cost |
 | [docs/governance.md](docs/governance.md) | Unity Catalog RBAC, personas, masking, tags, lineage |
 | [docs/environments.md](docs/environments.md) | dev/qa/prod model, catalogs, schemas, promotion |
 | [docs/cicd.md](docs/cicd.md) | Asset Bundles + GitHub Actions, branch strategy, promotion gates |
