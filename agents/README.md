@@ -15,6 +15,7 @@ Agents never write data, never see raw bronze, and never see unmasked PII.
 | `data_steward` | Lineage, metadata, freshness, sensitivity for stewards/governance | `system.access.table_lineage`, `system.access.column_lineage`, `information_schema.*`, UC tags |
 | `platform_ops` | Job/pipeline run health, schema drift, SLA breaches for platform eng | `system.lakeflow.*` job/run tables, DLT/pipeline event logs |
 | `finance_reconciliation` | CRM-vs-ERP variance, bookings/billings/collections reconciliation | `gold.bookings_vs_billings`, `gold.collections_risk`, `silver.invoice`, `silver.payment` |
+| `document_intelligence` | RAG over commercial documents (contracts, MSAs, quotes) with citations | `silver.vs_doc_chunks_index` (Vector Search; PII-masked chunks) |
 
 ## Shared guardrails
 
@@ -49,5 +50,8 @@ These stubs illustrate the intended production pattern on Databricks:
   governed principal, so UC enforces access on every call.
 
 Each agent folder has its own `README.md` (scope, example questions, exact
-objects, guardrails) and an `agent.py` stub. **All `agent.py` files are stubs**
-— `run_sql()` is a placeholder and no credentials are embedded.
+objects, guardrails) and an `agent.py`. The five **SQL** agents are stubs —
+`run_sql()` is a placeholder and no credentials are embedded. `document_intelligence`
+is a **RAG** agent whose retrieval (`retrieve()`) is **wired** to Databricks Vector
+Search (lazily imported); it needs the `databricks-vector-search` connector and a
+live index to run. No credentials are embedded in any agent.

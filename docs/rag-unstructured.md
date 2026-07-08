@@ -142,11 +142,13 @@ Native keeps the platform's core promise intact: **agents consume UC-governed su
 - `src/pipelines/silver/document_chunking.py` — `silver_doc_chunks` with a pure-Python,
   unit-tested `chunk_text()` and PII masking hook.
 - `resources/unstructured_ingestion.pipeline.yml` — the DLT pipeline wiring.
-- A unit test for `chunk_text()`.
+- Unit tests for `chunk_text()` and the agent's pure helpers.
+- `agents/document_intelligence/` — a RAG agent whose `retrieve()` is **wired** to
+  Vector Search `similarity_search` (customer-scoped filter + doc/page citations),
+  with the connector lazily imported so the module loads off-cluster.
 
 **Deferred (not today):**
 - Vector Search index creation DDL + endpoint (one-time, run in the workspace — sketched in §6).
-- Agent retrieval tool wired into an `agents/` module.
 - Content-based customer/entity linking (beyond filename convention).
 - `ai_parse_document` upgrade + table extraction fidelity.
 - Governance grants/tags for the index; DQ/SLA on parse success rate.
