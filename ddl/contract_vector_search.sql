@@ -70,11 +70,11 @@ CREATE TABLE IF NOT EXISTS ${catalog}.contracts.gold_contract_chunks (
   expiry_date     STRING,
   version         INT,
   is_current      BOOLEAN,
-  _merged_at      TIMESTAMP
+  _merged_at      TIMESTAMP,
+  -- PK defined inline (idempotent via CREATE TABLE IF NOT EXISTS); enables the
+  -- Delta Sync index primary_key = chunk_id. Databricks SQL does NOT support
+  -- `ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS`, so the PK lives here.
+  CONSTRAINT pk_gold_contract_chunks PRIMARY KEY (chunk_id)
 )
 COMMENT 'Deduplicated contract chunks; source of the Delta Sync vector index.'
 TBLPROPERTIES (delta.enableChangeDataFeed = true);   -- REQUIRED for Delta Sync
-
--- Primary key enables the Delta Sync index primary_key = chunk_id.
-ALTER TABLE ${catalog}.contracts.gold_contract_chunks
-  ADD CONSTRAINT IF NOT EXISTS pk_gold_contract_chunks PRIMARY KEY (chunk_id);
