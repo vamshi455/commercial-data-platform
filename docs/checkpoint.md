@@ -40,12 +40,19 @@ Then: register the existing Postgres MCP server (`/Users/vamshi/AzureAI/mcp-serv
 then add one write-capable tool behind an approval gate.
 _"will continue on this in short time."_
 
-### contract_vector_search — built, NOT yet run
-Module complete + tested + bundle-validated; dev VS endpoint `cdp_contracts_vs`
-is ONLINE (⚠️ always-on billed). To run: move the 5 contract PDFs from
-`cdp_dev.bronze.test/input/` → `/Volumes/cdp_dev/contracts/raw_contract_files/`,
-then `databricks bundle run job_contract_vector_search -t dev` (needs compute).
-Spec: [specs/contract-vector-search.md](specs/contract-vector-search.md).
+### contract_vector_search — RAN successfully in dev (2026-07-08)
+Full job ran end-to-end in dev: 5 contract PDFs → **11 chunks indexed** (bronze 5
+files → silver/gold 11 chunks → `contract_chunks_index`, 0 parse failures).
+Fixed 2 runtime bugs (committed to main): **ddl** inline PK (Databricks rejects
+`ADD CONSTRAINT IF NOT EXISTS`); **silver** explicit `createDataFrame` schemas
+(all-None metadata inferred NullType → `CANNOT_DETERMINE_TYPE`).
+⚠️ **VS endpoint `cdp_contracts_vs` DELETED to stop always-on cost.** Gold table
++ chunks are intact. To restore retrieval: recreate the endpoint
+(`databricks vector-search-endpoints create-endpoint --name cdp_contracts_vs --endpoint-type STANDARD`)
+then `databricks bundle run job_contract_vector_search -t dev --only index_sync`
+(re-embeds existing gold; no re-parsing).
+⚠️ Sample docs are still oil-themed (metadata reads oil-trade) — reframe to
+industrial-equipment pending. Spec: [specs/contract-vector-search.md](specs/contract-vector-search.md).
 
 ### Authentic source-table names in bronze — added 2026-07-07 — 🔽 VERY LOW PRIORITY
 Backlog idea: rename bronze tables from `crm_*`/`erp_*` to real source-system names
