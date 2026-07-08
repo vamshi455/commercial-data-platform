@@ -157,6 +157,11 @@ Native keeps the platform's core promise intact: **agents consume UC-governed su
 
 ## 6. Vector index — one-time setup (run in the workspace, not a DLT table)
 
+> **Runnable notebook:** [`notebooks/rag/create_vector_index.py`](../notebooks/rag/create_vector_index.py)
+> does all of the below idempotently (preflight → endpoint → Delta Sync Index →
+> grant to `cdp_ai_app_users` → smoke retrieval), parameterized by `catalog`
+> widget for dev/qa/prod. The snippet here is the essence.
+
 ```python
 # Databricks notebook / job — creates the endpoint + Delta Sync Index once.
 from databricks.vector_search.client import VectorSearchClient

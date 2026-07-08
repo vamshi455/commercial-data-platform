@@ -14,6 +14,7 @@ notebook runs against cdp_dev / cdp_qa / cdp_prod.
 | `observability/` | `run_health.sql` | Job/pipeline run status, failures, SLA breaches, reliability rollup | `system.lakeflow.job_run_timeline` |
 | `lineage/` | `impact_analysis.sql` | "What depends on X" — direct + recursive downstream impact, upstream root-cause, column-level impact | `system.access.table_lineage` / `column_lineage` |
 | `analytics/` | `exec_summary.sql` | Exec KPIs — weighted pipeline, bookings vs billings, collections risk, account health | `gold.*` curated products |
+| `rag/` | `create_vector_index.py` | One-time (per env) creation of the document Vector Search index for the RAG track | `silver.doc_chunks` → `silver.vs_doc_chunks_index` |
 | `setup/` | (reserved) | Environment / governance setup notebooks |
 
 ## Conventions
