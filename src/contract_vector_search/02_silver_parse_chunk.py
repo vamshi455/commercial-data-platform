@@ -15,7 +15,7 @@ from config import from_widgets           # noqa: E402
 from chunking import chunk_text, make_chunk_id  # noqa: E402  (make_chunk_id used in gold)
 from metadata_extract import extract_metadata   # noqa: E402
 
-from pyspark.sql import functions as F, Row  # noqa: E402
+from pyspark.sql import functions as F, Row, types as T  # noqa: E402
 
 cfg = from_widgets(dbutils)  # noqa: F821
 spark.conf.set("spark.sql.shuffle.partitions", "8")  # noqa: F821  (small doc volume)
@@ -83,7 +83,7 @@ for path in files:
         # ai_parse_document returns a struct; text lives under document/pages.
         text = _extract_text(parsed)
         if not text or not text.strip():
-            failed_rows.append(Row(source_file=path, error="empty_parse", failed_at=None))
+            failed_rows.append(Row(source_file=path, error="empty_parse"))
             continue
         meta = extract_metadata(path, text)
         for ch in chunk_text(text):
@@ -95,15 +95,36 @@ for path in files:
                 expiry_date=meta.expiry_date, version=meta.version, is_current=meta.is_current,
             ))
     except Exception as e:  # noqa: BLE001 - never silently drop
-        failed_rows.append(Row(source_file=path, error=str(e)[:1000], failed_at=None))
+        failed_rows.append(Row(source_file=path, error=str(e)[:1000]))
 
 # COMMAND ----------
+# Explicit schemas (mirror the DDL) — never rely on inference: with only a few
+# docs, an all-None metadata column (e.g. effective_date) infers as NullType and
+# raises [CANNOT_DETERMINE_TYPE]. Field order matches the Row(...) construction.
+_SILVER_SCHEMA = T.StructType([
+    T.StructField("source_file", T.StringType()),
+    T.StructField("chunk_seq", T.IntegerType()),
+    T.StructField("chunk_text", T.StringType()),
+    T.StructField("page_number", T.IntegerType()),
+    T.StructField("contract_id", T.StringType()),
+    T.StructField("counterparty", T.StringType()),
+    T.StructField("contract_type", T.StringType()),
+    T.StructField("effective_date", T.StringType()),
+    T.StructField("expiry_date", T.StringType()),
+    T.StructField("version", T.IntegerType()),
+    T.StructField("is_current", T.BooleanType()),
+])
+_FAILURES_SCHEMA = T.StructType([
+    T.StructField("source_file", T.StringType()),
+    T.StructField("error", T.StringType()),
+])
+
 if parsed_rows:
-    (spark.createDataFrame(parsed_rows)  # noqa: F821
+    (spark.createDataFrame(parsed_rows, schema=_SILVER_SCHEMA)  # noqa: F821
         .withColumn("_parsed_at", F.current_timestamp())
         .write.mode("append").saveAsTable(cfg.silver_table))
 if failed_rows:
-    (spark.createDataFrame(failed_rows)  # noqa: F821
+    (spark.createDataFrame(failed_rows, schema=_FAILURES_SCHEMA)  # noqa: F821
         .withColumn("failed_at", F.current_timestamp())
         .write.mode("append").saveAsTable(cfg.failures_table))
 print(f"[silver] wrote {len(parsed_rows)} chunks, {len(failed_rows)} failures")
