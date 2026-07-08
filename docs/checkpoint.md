@@ -47,6 +47,16 @@ is ONLINE (⚠️ always-on billed). To run: move the 5 contract PDFs from
 then `databricks bundle run job_contract_vector_search -t dev` (needs compute).
 Spec: [specs/contract-vector-search.md](specs/contract-vector-search.md).
 
+### Authentic source-table names in bronze — added 2026-07-07 — 🔽 VERY LOW PRIORITY
+Backlog idea: rename bronze tables from `crm_*`/`erp_*` to real source-system names
+(Salesforce `sfdc_account`/`sfdc_opportunity`/…, SAP `sap_kna1`/`sap_vbak`/`sap_vbrk`/
+`sap_acdoca`/…) so bronze mirrors true sources; silver/gold stay clean (conform-the-mess
+realism). Decided **authentic bronze, clean silver** direction, then parked. Full
+mapping + scope (autoloaders, silver read-refs, naming-conventions §4.1/§9, source-systems,
+data-contracts) is in the 2026-07-07 chat. Natural moment to also fix D2 redundant-prefix
+drift. Low-risk (dev CRM bronze already dropped mid-cutover). Do NOT prioritize over D6
+CRM cutover or the MES/PLM/WMS generators.
+
 ## Related state
 - QA + PROD Databricks workspaces deleted 2026-07-04 (NAT-gateway cost cut).
 - Git: main-only workflow (commit/push straight to main).

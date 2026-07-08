@@ -53,11 +53,16 @@ def _page_for(parsed, seq: int) -> int:
 # COMMAND ----------
 # Determine which bronze files still need parsing (anti-join on source_file).
 bronze = spark.table(cfg.bronze_table)  # noqa: F821
-done = (
-    spark.table(cfg.silver_table).select("source_file")  # noqa: F821
-    .union(spark.table(cfg.failures_table).select(F.col("source_file")))  # noqa: F821
-    .distinct()
-) if spark.catalog.tableExists(cfg.silver_table) else None  # noqa: F821
+# Union whichever of silver / failures already exist. A run with zero failures
+# never creates the failures table, so guard each table independently — reading
+# a not-yet-created table would raise TABLE_OR_VIEW_NOT_FOUND on the next run.
+done = None
+for tbl in (cfg.silver_table, cfg.failures_table):
+    if spark.catalog.tableExists(tbl):  # noqa: F821
+        part = spark.table(tbl).select(F.col("source_file"))  # noqa: F821
+        done = part if done is None else done.union(part)
+if done is not None:
+    done = done.distinct()
 
 todo = bronze.join(done, bronze.path == done.source_file, "left_anti") if done is not None else bronze
 files = [r.path for r in todo.select("path").distinct().collect()]

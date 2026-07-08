@@ -12,7 +12,7 @@
 
 -- Schema + volumes -----------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS ${catalog}.contracts
-  COMMENT 'Crude-oil contract documents: raw files, parsed text, RAG chunks.';
+  COMMENT 'Industrial-equipment sales & procurement contracts: raw files, parsed text, RAG chunks.';
 
 CREATE VOLUME IF NOT EXISTS ${catalog}.contracts.raw_contract_files
   COMMENT 'Landing volume for incoming contract PDFs (Auto Loader source).';
