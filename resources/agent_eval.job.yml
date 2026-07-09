@@ -52,6 +52,9 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               vs_endpoint: ${var.vs_endpoint}
+              # Deployed bundle files root so the notebook can import the agent +
+              # retriever from sibling dirs (no reliable __file__ in a job notebook).
+              source_root: ${workspace.file_path}
 
       queue:
         enabled: true

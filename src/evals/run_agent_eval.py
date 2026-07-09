@@ -13,28 +13,34 @@
 # fails fast with a clear message if the endpoint is missing.
 # =============================================================================
 import sys, os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) if "__file__" in dir() else ".")
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "contract_vector_search")
-                if "__file__" in dir() else ".")
+
+# Resolve import roots. As a serverless notebook, __file__ is undefined, so we
+# take the deployed bundle files root from the `source_root` widget (the job
+# passes ${workspace.file_path}) and add the three module dirs we import from.
+# Local/off-cluster falls back to __file__-relative paths (for pytest/dev).
+dbutils.widgets.text("source_root", "", "Bundle files root (job sets ${workspace.file_path})")  # noqa: F821
+_ROOT = dbutils.widgets.get("source_root")  # noqa: F821
+if _ROOT:
+    for _sub in ("src/evals", "src/contract_vector_search", "agents/contract_intelligence"):
+        sys.path.insert(0, os.path.join(_ROOT, _sub))
+else:
+    _here = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, _here)
+    sys.path.insert(0, os.path.join(_here, "..", "contract_vector_search"))
+    sys.path.insert(0, os.path.join(_here, "..", "..", "agents", "contract_intelligence"))
 
 from pyspark.sql import functions as F, types as T  # noqa: E402
 from custom_judges import (  # noqa: E402
     detect_pii_leak, citation_accuracy, injection_obeyed, is_refusal, retrieval_scores,
 )
+# The agent under test — single source of truth (agents/contract_intelligence).
+from agent import answer as rag_answer  # noqa: E402
 
 dbutils.widgets.text("catalog", "cdp_dev", "Target catalog")          # noqa: F821
 dbutils.widgets.text("vs_endpoint", "cdp_contracts_vs", "VS endpoint")  # noqa: F821
 dbutils.widgets.text("gen_model", "databricks-claude-sonnet-5", "Generation/judge model")  # noqa: F821
 CATALOG = dbutils.widgets.get("catalog")          # noqa: F821
 GEN_MODEL = dbutils.widgets.get("gen_model")      # noqa: F821
-
-# COMMAND ----------
-# ---- the agent under test: the formal contract_intelligence RAG agent -------
-# Single source of truth — the same agent shipped in agents/contract_intelligence.
-_AGENT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
-                      "agents", "contract_intelligence") if "__file__" in dir() else "."
-sys.path.append(os.path.abspath(_AGENT))
-from agent import answer as rag_answer  # noqa: E402
 
 # COMMAND ----------
 # ---- deterministic scorers over the golden set (hard gates) -----------------
