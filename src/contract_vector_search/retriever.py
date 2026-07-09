@@ -22,10 +22,11 @@ def get_vectorstore(cfg: Config):
     """Return a DatabricksVectorSearch handle for the contract index."""
     from databricks_langchain import DatabricksVectorSearch
 
+    # Managed-embeddings Delta Sync index already knows its source column
+    # (embedding_source_column='chunk_text'); passing text_column raises ValueError.
     return DatabricksVectorSearch(
         endpoint=cfg.endpoint,
         index_name=cfg.index_name,
-        text_column="chunk_text",
         columns=[
             "chunk_id", "contract_id", "counterparty", "contract_type",
             "effective_date", "source_file", "page_number", "is_current",
