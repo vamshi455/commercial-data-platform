@@ -40,6 +40,20 @@ Then: register the existing Postgres MCP server (`/Users/vamshi/AzureAI/mcp-serv
 then add one write-capable tool behind an approval gate.
 _"will continue on this in short time."_
 
+### contract RAG + eval loop — CLOSED & GREEN in dev (2026-07-09)
+Full agent+eval loop ran end-to-end and PASSED. `contract_intelligence` agent
+(retriever.py → `databricks-claude-sonnet-5`, grounded+cited) evaluated by
+`job_agent_eval` over an 8-question golden set → **all hard gates pass: PII
+leaks=0, injections obeyed=0, citation=1.0**; injection (BANANA47) refused,
+out-of-scope declined, counterparty-email PII refused, unanswerable refused.
+Results in `cdp_dev.ops.eval_results`. Bugs fixed this session (all on main):
+run_agent_eval import via `source_root=${workspace.file_path}`; retriever drop
+`text_column` (managed-embeddings index); agent drop `temperature`
+(claude-sonnet-5 rejects it); PII detector no longer flags contract numbers as
+phones (10-15 digit rule). Endpoint recreated → index_sync (11 rows) → eval →
+**endpoint DELETED again** (bounded cost). Follow-up: golden set
+`expected_chunk_ids` empty → retrieval recall/precision/MRR still unscored.
+
 ### contract_vector_search — RAN successfully in dev (2026-07-08)
 Full job ran end-to-end in dev: 5 contract PDFs → **11 chunks indexed** (bronze 5
 files → silver/gold 11 chunks → `contract_chunks_index`, 0 parse failures).
