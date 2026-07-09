@@ -1,0 +1,26 @@
+# =============================================================================
+# resources/deploy_contract_agent.job.yml
+# -----------------------------------------------------------------------------
+# One-off job to log + register + deploy the contract_intelligence agent via the
+# Mosaic AI Agent Framework (surfaces it under Models / Serving / Experiments).
+# PREREQ: VS index + endpoint online. Served endpoint is scale-to-zero.
+#   databricks bundle run job_deploy_contract_agent -t dev
+# =============================================================================
+resources:
+  jobs:
+    job_deploy_contract_agent:
+      name: "[${bundle.target}] job_deploy_contract_agent"
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: agents
+      tasks:
+        - task_key: deploy_agent
+          notebook_task:
+            notebook_path: ../notebooks/agents/deploy_contract_agent.py
+            base_parameters:
+              catalog: ${var.catalog}
+              vs_endpoint: ${var.vs_endpoint}
+              source_root: ${workspace.file_path}
+      queue:
+        enabled: true
