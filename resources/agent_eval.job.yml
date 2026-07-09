@@ -1,0 +1,57 @@
+# =============================================================================
+# resources/agent_eval.job.yml
+# -----------------------------------------------------------------------------
+# Agent/RAG evaluation job (see docs/agent-evals.md). Seeds the golden set then
+# evaluates the contract RAG agent: deterministic hard-gate scorers (PII leak,
+# injection, citation, retrieval) + optional Mosaic AI Agent Evaluation judges.
+# On-demand (and CI-triggerable). NOT scheduled.
+#
+# PREREQ to RUN: VS endpoint cdp_contracts_vs ONLINE + a judge/gen model endpoint.
+# Deploying this file costs nothing; running it spins compute + LLM tokens.
+#   databricks bundle run job_agent_eval -t dev
+# =============================================================================
+resources:
+  jobs:
+    job_agent_eval:
+      name: "[${bundle.target}] job_agent_eval"
+
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: evals
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: vs_endpoint
+          default: ${var.vs_endpoint}
+
+      # SDKs for retrieval + agent evaluation.
+      environments:
+        - environment_key: eval_env
+          spec:
+            client: "2"
+            dependencies:
+              - mlflow
+              - databricks-agents
+              - databricks-vectorsearch
+              - databricks-langchain
+
+      tasks:
+        - task_key: seed_eval_dataset
+          notebook_task:
+            notebook_path: ../src/evals/eval_dataset_seed.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+        - task_key: run_agent_eval
+          depends_on: [{ task_key: seed_eval_dataset }]
+          environment_key: eval_env
+          notebook_task:
+            notebook_path: ../src/evals/run_agent_eval.py
+            base_parameters:
+              catalog: ${var.catalog}
+              vs_endpoint: ${var.vs_endpoint}
+
+      queue:
+        enabled: true
