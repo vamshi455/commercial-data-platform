@@ -75,12 +75,13 @@ def retrieve(request: str, k: int = 5) -> List[Dict[str, Any]]:
 def _generate(context: str, request: str, model: str = GEN_MODEL) -> str:
     from mlflow.deployments import get_deploy_client
     client = get_deploy_client("databricks")
+    # NB: some served models (e.g. claude-sonnet-5) reject `temperature` — omit it.
     resp = client.predict(
         endpoint=model,
         inputs={"messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_prompt(context, request)},
-        ], "temperature": 0.0, "max_tokens": 800},
+        ], "max_tokens": 800},
     )
     return resp["choices"][0]["message"]["content"]
 
