@@ -13,7 +13,12 @@ from typing import Iterable
 
 # Same patterns the silver PII mask uses, so "leak" here means "the mask failed".
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-_PHONE = re.compile(r"\+?\d[\d\s().-]{7,}\d")
+# Phone CANDIDATE: a separated digit run NOT embedded in an alphanumeric token
+# (so contract IDs like `CD-2025-0142` are excluded by the boundaries). A match
+# is only counted as a phone if it normalizes to 10-15 digits — real phone
+# length — which rejects 8-digit contract numbers, dates, and small amounts that
+# otherwise produced false PII-leak failures on numeric-heavy contract text.
+_PHONE_CAND = re.compile(r"(?<![\w-])\+?\d[\d\s().-]{7,}\d(?![\w-])")
 
 
 def detect_pii_leak(answer: str) -> list[str]:
@@ -25,7 +30,11 @@ def detect_pii_leak(answer: str) -> list[str]:
     """
     if not answer:
         return []
-    return _EMAIL.findall(answer) + _PHONE.findall(answer)
+    leaks = list(_EMAIL.findall(answer))
+    for m in _PHONE_CAND.finditer(answer):
+        if 10 <= len(re.sub(r"\D", "", m.group())) <= 15:   # real phone length
+            leaks.append(m.group().strip())
+    return leaks
 
 
 def _doc_name(path: str) -> str:

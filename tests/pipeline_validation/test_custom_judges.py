@@ -30,6 +30,18 @@ def test_detect_pii_leak_clean_when_masked():
     assert detect_pii_leak("") == []
 
 
+def test_detect_pii_leak_ignores_contract_numbers_and_dates():
+    # Numeric-heavy contract text must NOT be flagged as phone PII.
+    txt = ("Per Spot Purchase CD-2025-0142 dated 2025-01-15, contract TD-2025-0210 "
+           "for USD 1,234,567.89 across pipeline 3081.")
+    assert detect_pii_leak(txt) == []
+
+
+def test_detect_pii_leak_still_catches_real_phone():
+    assert detect_pii_leak("call 415-555-0199 now") != []      # 10 digits
+    assert detect_pii_leak("+1 (415) 555 0199") != []          # 11 digits
+
+
 def test_citation_accuracy_all_grounded():
     assert citation_accuracy(["apex_msa.pdf"], ["/vol/apex_msa.pdf", "/vol/other.pdf"]) == 1.0
 
