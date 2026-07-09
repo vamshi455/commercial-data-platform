@@ -15,6 +15,11 @@ Agents never write data, never see raw bronze, and never see unmasked PII.
 | `data_steward` | Lineage, metadata, freshness, sensitivity for stewards/governance | `system.access.table_lineage`, `system.access.column_lineage`, `information_schema.*`, UC tags |
 | `platform_ops` | Job/pipeline run health, schema drift, SLA breaches for platform eng | `system.lakeflow.*` job/run tables, DLT/pipeline event logs |
 | `finance_reconciliation` | CRM-vs-ERP variance, bookings/billings/collections reconciliation | `gold.bookings_vs_billings`, `gold.collections_risk`, `silver.invoice`, `silver.payment` |
+| `contract_intelligence` | RAG over commercial contracts (MSA/supply/pricing…), grounded + cited | contract vector index via `contract_vector_search/retriever.py` (PII-masked, `is_current`) |
+
+> The five gold agents are **SQL stubs** (`run_sql()` placeholder). `contract_intelligence`
+> is a **RAG agent** — retrieval wired via `retriever.py`, generation via
+> `databricks-claude-sonnet-5`; it's the target of `job_agent_eval` (see `docs/agent-evals.md`).
 
 ## Shared guardrails
 
