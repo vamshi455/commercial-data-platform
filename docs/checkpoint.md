@@ -40,6 +40,20 @@ Then: register the existing Postgres MCP server (`/Users/vamshi/AzureAI/mcp-serv
 then add one write-capable tool behind an approval gate.
 _"will continue on this in short time."_
 
+### contract_intelligence agent — DEPLOYED via Mosaic AI (2026-07-09)
+Logged + registered + served through the Agent Framework, so it now appears in
+**Models / Serving / Experiments**. `agents/contract_intelligence/model.py`
+(mlflow ChatAgent) → `notebooks/agents/deploy_contract_agent.py`
+(`job_deploy_contract_agent`): log-from-code + resources (VS index + gen
+endpoint) → UC model `cdp_dev.contracts.contract_intelligence` v1 →
+`agents.deploy(scale_to_zero=True)` → serving endpoint
+`agents_cdp_dev-contracts-contract_intelligence`. Agent endpoint scales to zero
+(≈no idle cost); the always-on cost is the VS endpoint (needed for retrieval).
+⚠️ **Recreate gotcha:** deleting a VS endpoint ORPHANS the index UC entity —
+`index_sync` then fails "UC entity … already exists" while get-index says
+missing. Fix: `databricks vector-search-indexes delete-index
+cdp_dev.contracts.contract_chunks_index` BEFORE re-running index_sync.
+
 ### contract RAG + eval loop — CLOSED & GREEN in dev (2026-07-09)
 Full agent+eval loop ran end-to-end and PASSED. `contract_intelligence` agent
 (retriever.py → `databricks-claude-sonnet-5`, grounded+cited) evaluated by
