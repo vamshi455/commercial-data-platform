@@ -197,6 +197,10 @@ hits = idx.similarity_search(
 
 ---
 
+> **Deploying this?** Follow [`rag-deploy-runbook.md`](./rag-deploy-runbook.md) —
+> bundle deploy → land docs → run pipeline → create index → smoke-test the agent,
+> with verification SQL and rollback steps.
+
 ## 7. Open questions for review
 - **Chunk size / overlap** — 800/100 is a default; tune per doc corpus (contracts vs. workbooks).
 - **Customer linking** — filename convention now; do we invest in content-based linking soon?

@@ -139,6 +139,7 @@ Promotion to `qa` / `prod` is the **same commands with `-t qa` / `-t prod`** —
 | [docs/observability.md](docs/observability.md) | Lineage, freshness, DQ, SLA dashboards, system tables |
 | [docs/agents.md](docs/agents.md) | AI agents, what data they may touch, guardrails |
 | [docs/rag-unstructured.md](docs/rag-unstructured.md) | Unstructured/RAG lane: PDF & Excel → chunks → Vector Search → RAG agents |
+| [docs/rag-deploy-runbook.md](docs/rag-deploy-runbook.md) | Step-by-step deploy of the RAG lane (bundle → land docs → pipeline → index → agent) |
 | [docs/naming-conventions.md](docs/naming-conventions.md) | Catalog/schema/table/column/job naming standards |
 | [docs/project-plan.md](docs/project-plan.md) | 7 phases, deliverables, milestones |
 
