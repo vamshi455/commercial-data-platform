@@ -8,17 +8,17 @@
 # notebooks/agentic_actions/review_queue.sql), and decisions feed
 # ops.action_feedback. Idempotent per run_id.
 # =============================================================================
-import sys, os
+import sys, os, uuid
 dbutils.widgets.text("catalog", "cdp_dev", "Target catalog")       # noqa: F821
-dbutils.widgets.text("run_id", "", "Run id (defaults to job run)")  # noqa: F821
+dbutils.widgets.text("run_id", "", "Run id (job passes {{job.run_id}})")  # noqa: F821
 dbutils.widgets.text("gen_model", "databricks-claude-sonnet-5", "LLM")  # noqa: F821
 dbutils.widgets.text("source_root", "", "Bundle files root")        # noqa: F821
 
 CATALOG = dbutils.widgets.get("catalog")     # noqa: F821
 GEN_MODEL = dbutils.widgets.get("gen_model")  # noqa: F821
 ROOT = dbutils.widgets.get("source_root")     # noqa: F821
-RUN_ID = dbutils.widgets.get("run_id") or dbutils.notebook.entry_point.getDbutils(  # noqa: F821
-).notebook().getContext().currentRunId().toString()
+# Serverless whitelists block currentRunId(); use the passed job run id, else a uuid.
+RUN_ID = dbutils.widgets.get("run_id") or uuid.uuid4().hex[:16]  # noqa: F821
 
 _AGENT = os.path.join(ROOT, "agents", "collections") if ROOT else \
     os.path.abspath("../../agents/collections")

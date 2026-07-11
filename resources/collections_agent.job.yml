@@ -43,5 +43,6 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               source_root: ${workspace.file_path}
+              run_id: "{{job.run_id}}"
       queue:
         enabled: true
