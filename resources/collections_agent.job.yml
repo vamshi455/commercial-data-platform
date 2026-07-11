@@ -1,0 +1,47 @@
+# =============================================================================
+# resources/collections_agent.job.yml
+# -----------------------------------------------------------------------------
+# Agentic-action flagship: the collections agent (anomaly → diagnose → draft →
+# ops.action_queue for human approval). No vector endpoint needed — gold SQL +
+# LLM only. On-demand.
+#   databricks bundle run job_collections_agent -t dev
+# =============================================================================
+resources:
+  jobs:
+    job_collections_agent:
+      name: "[${bundle.target}] job_collections_agent"
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: agentic-actions
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+      environments:
+        - environment_key: llm_env
+          spec:
+            client: "2"
+            dependencies:
+              - mlflow
+      tasks:
+        - task_key: ddl
+          notebook_task:
+            notebook_path: ../ddl/agentic_actions.sql
+            base_parameters:
+              catalog: ${var.catalog}
+        - task_key: seed_collections_risk
+          depends_on: [{ task_key: ddl }]
+          notebook_task:
+            notebook_path: ../src/agentic_actions/seed_collections_risk.py
+            base_parameters:
+              catalog: ${var.catalog}
+        - task_key: run_collections_agent
+          depends_on: [{ task_key: seed_collections_risk }]
+          environment_key: llm_env
+          notebook_task:
+            notebook_path: ../src/agentic_actions/run_collections_agent.py
+            base_parameters:
+              catalog: ${var.catalog}
+              source_root: ${workspace.file_path}
+      queue:
+        enabled: true
