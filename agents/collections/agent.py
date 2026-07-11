@@ -115,12 +115,22 @@ def diagnose_and_draft(account: dict, model: str = GEN_MODEL) -> dict:
     resp = get_deploy_client("databricks").predict(
         endpoint=model,
         inputs={"messages": [{"role": "user", "content": prompt}], "max_tokens": 600})
-    text = resp["choices"][0]["message"]["content"]
-    return parse_llm_json(text)
+    return parse_llm_json(_content_text(resp))
 
 
-def parse_llm_json(text: str) -> dict:
+def _content_text(resp: dict) -> str:
+    """Normalize a chat response to text. Claude returns `content` as a list of
+    blocks ([{'type':'text','text':...}]); other models return a plain string."""
+    content = resp["choices"][0]["message"]["content"]
+    if isinstance(content, list):
+        return "".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
+    return content or ""
+
+
+def parse_llm_json(text) -> dict:
     """Lenient extraction of {diagnosis, draft} from an LLM reply."""
+    if not isinstance(text, str):
+        text = _content_text({"choices": [{"message": {"content": text}}]})
     try:
         m = re.search(r"\{.*\}", text or "", re.DOTALL)
         obj = json.loads(m.group()) if m else {}

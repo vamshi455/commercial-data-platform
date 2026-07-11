@@ -72,3 +72,16 @@ def test_parse_llm_json_lenient():
     assert ok == {"diagnosis": "d", "draft": "e"}
     fallback = agent.parse_llm_json("no json here")
     assert fallback["diagnosis"] == "(no diagnosis)" and fallback["draft"] == "no json here"
+
+
+def test_content_text_handles_string_and_claude_blocks():
+    # plain string
+    assert agent._content_text({"choices": [{"message": {"content": "hi"}}]}) == "hi"
+    # Claude list-of-blocks
+    blocks = [{"type": "text", "text": "part1 "}, {"type": "text", "text": "part2"}]
+    assert agent._content_text({"choices": [{"message": {"content": blocks}}]}) == "part1 part2"
+
+
+def test_parse_llm_json_accepts_block_list():
+    blocks = [{"type": "text", "text": '{"diagnosis":"x","draft":"y"}'}]
+    assert agent.parse_llm_json(blocks) == {"diagnosis": "x", "draft": "y"}
