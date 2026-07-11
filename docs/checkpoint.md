@@ -4,6 +4,23 @@ Running list of parked/pending threads to pick up. Newest first.
 
 ## ⏳ PENDING
 
+### Agentic actions (beyond BI) — collections agent LIVE & GREEN (2026-07-10)
+Flagship monitor→diagnose→draft→HITL→learn loop working in dev. `job_collections_agent`
+(ddl→seed→run): scans `gold.collections_risk` → detects actionable (rules) → LLM
+(claude-sonnet-5) diagnoses + drafts (dunning email / CSM escalation) → writes proposals
+to `ops.action_queue` (status=pending). 8 accts → 5 proposals, priority-routed, genuine
+"oversight vs distress" reasoning. Human approves in `notebooks/agentic_actions/review_queue.sql`
+→ `ops.action_feedback` (learning signal). **Shared infra** (action_queue + action_feedback)
+is reused by the portfolio (revenue-leakage/churn/pipeline) + the MDM steward app. No serving
+endpoint → zero standing cost. Bugs fixed: serverless `currentRunId()` not whitelisted (→ uuid
++ `{{job.run_id}}`); Claude returns `content` as list-of-blocks (→ `_content_text`). Synthetic
+`collections_risk` seed for now — swap to real gold after D6. Polish: 1/5 LLM JSON miss (lenient
+fallback caught it) — tighten with structured outputs.
+**PII decision (2026-07-10):** DON'T build a scanner — **UC Data Classification + ABAC are GA**
+(agentic auto-tag + review UI). Re-aim the custom steward app at **MDM/entity stewardship**
+(the Tamr-shaped gap), reusing action_queue/feedback. Federation for Postgres: pending stable
+ngrok endpoint. Iceberg: adopt via **UniForm** on Snowflake-bound gold (multi-engine).
+
 ### Project-review decisions (2026-07-04) — see [decisions.md](decisions.md)
 Answered 9 review doubts. **Done:** CI/CD qa+prod disabled, oil→manufacturing scrub,
 plan-table status refresh, docs corrected (naming drift note, CRM account fields
