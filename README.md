@@ -136,6 +136,10 @@ Promotion to `qa` / `prod` is the **same commands with `-t qa` / `-t prod`** —
 | [docs/jobs-and-pipelines.md](docs/jobs-and-pipelines.md) | Deployed jobs & pipelines: tasks, DAGs, triggers, compute, cost |
 | [docs/agent-evals.md](docs/agent-evals.md) | Agent & RAG evaluation: scenarios, LLM-as-judge, metrics, deploy steps |
 | [docs/snowflake-port.md](docs/snowflake-port.md) | Plan to build the same platform on Snowflake (Cortex/Search/Analyst/MCP) |
+| [docs/specs/agentic-actions.md](docs/specs/agentic-actions.md) | Agents beyond BI: monitor→diagnose→draft→HITL→learn; portfolio + shared infra |
+| [docs/specs/agent-memory.md](docs/specs/agent-memory.md) | Agent memory: working/semantic/episodic/procedural/context-builder/model |
+| [docs/maturity-assessment.md](docs/maturity-assessment.md) | 5-area maturity scorecard: advances, gaps, what to adopt |
+| [docs/databricks-gotchas.md](docs/databricks-gotchas.md) | Serverless/agent/Vector Search gotchas learned the hard way |
 | [docs/governance.md](docs/governance.md) | Unity Catalog RBAC, personas, masking, tags, lineage |
 | [docs/environments.md](docs/environments.md) | dev/qa/prod model, catalogs, schemas, promotion |
 | [docs/cicd.md](docs/cicd.md) | Asset Bundles + GitHub Actions, branch strategy, promotion gates |
