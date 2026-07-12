@@ -39,5 +39,10 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.gold")  # noqa: F821
 (spark.createDataFrame(ROWS, schema=schema)  # noqa: F821
     .withColumn("_seeded_at", F.current_timestamp())
     .write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(TABLE))
+spark.sql(  # noqa: F821
+    f"COMMENT ON TABLE {TABLE} IS 'Accounts-receivable collections risk by account "
+    f"(ar_balance, oldest_invoice_days, risk_tier, account_health). Source for the "
+    f"collections action agent. NOTE: synthetic seed until the CRM cutover (D6) "
+    f"lands. See docs/specs/agentic-actions.md.'")
 print(f"[seed] wrote {len(ROWS)} accounts to {TABLE}")
 display(spark.table(TABLE))  # noqa: F821

@@ -63,5 +63,9 @@ schema = T.StructType([
 df = (spark.createDataFrame(SEED, schema=schema)  # noqa: F821
       .withColumn("_seeded_at", F.current_timestamp()))
 (df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(TABLE))
+spark.sql(  # noqa: F821
+    f"COMMENT ON TABLE {TABLE} IS 'Golden evaluation set for the "
+    f"contract_intelligence agent: request, expected_facts, expected_chunk_ids, "
+    f"category (retrieval/groundedness/safety/edge-case). See docs/agent-evals.md.'")
 print(f"[eval] wrote {df.count()} golden rows to {TABLE}")
 display(spark.table(TABLE))  # noqa: F821

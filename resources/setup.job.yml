@@ -14,6 +14,11 @@ resources:
   jobs:
     job_platform_setup:
       name: "[${bundle.target}] job_platform_setup"
+      description: >-
+        One-time governance bootstrap: create catalog/schemas/landing volume,
+        apply persona RBAC grants, and bind masking + row filters + tags. Tasks:
+        create_catalogs_schemas → grants_personas → masking_row_filters
+        (env-strict gold.is_prod guard). Docs: governance/README.md.
 
       tags:
         platform: commercial-data-platform

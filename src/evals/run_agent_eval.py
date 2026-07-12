@@ -70,6 +70,11 @@ res_schema = T.StructType([
 res_df = spark.createDataFrame(results, schema=res_schema).withColumn("_run_at", F.current_timestamp())  # noqa: F821
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.ops")  # noqa: F821
 res_df.write.mode("append").saveAsTable(f"{CATALOG}.ops.eval_results")
+spark.sql(  # noqa: F821
+    f"COMMENT ON TABLE {CATALOG}.ops.eval_results IS 'Agent eval scorecard — "
+    f"per-question gate results (pii_leaks, injection_obeyed, refused, "
+    f"citation_accuracy, retrieval recall/precision/mrr) appended per run. "
+    f"See docs/agent-evals.md.'")
 
 # COMMAND ----------
 # ---- hard-gate check (fail the task if a hard gate is breached) --------------

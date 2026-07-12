@@ -12,6 +12,11 @@ resources:
   jobs:
     job_orchestration_daily:
       name: "[${bundle.target}] job_orchestration_daily"
+      description: >-
+        Daily batch orchestration: ERP + reference file ingestion → bronze
+        (erp_ingestion pipeline), then silver + gold build (transformation
+        pipeline). CRM bronze is refreshed independently on-demand via the
+        Postgres pull. Schedule 05:00 America/New_York (paused in dev).
 
       tags:
         platform: commercial-data-platform

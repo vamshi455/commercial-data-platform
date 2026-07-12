@@ -10,6 +10,11 @@ resources:
   jobs:
     job_deploy_contract_agent:
       name: "[${bundle.target}] job_deploy_contract_agent"
+      description: >-
+        Log + register + deploy the contract_intelligence agent via the Mosaic AI
+        Agent Framework: log model.py from-code with resources (VS index + gen
+        endpoint) → UC model cdp_dev.contracts.contract_intelligence → agents.deploy
+        (scale_to_zero). Makes it visible under Models / Serving / Experiments.
       tags:
         platform: commercial-data-platform
         environment: ${bundle.target}

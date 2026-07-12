@@ -10,6 +10,13 @@ resources:
   jobs:
     job_collections_agent:
       name: "[${bundle.target}] job_collections_agent"
+      description: >-
+        Agentic action (beyond BI): monitor gold.collections_risk → detect
+        actionable AR accounts (rules) → LLM diagnose + draft (dunning email /
+        CSM escalation) → ops.action_queue (status=pending) for HUMAN approval →
+        ops.action_feedback learning loop. Draft-only; no vector endpoint.
+        Approve in notebooks/agentic_actions/review_queue.sql. Docs:
+        docs/specs/agentic-actions.md.
       tags:
         platform: commercial-data-platform
         environment: ${bundle.target}

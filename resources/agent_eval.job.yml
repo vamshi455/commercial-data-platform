@@ -14,6 +14,12 @@ resources:
   jobs:
     job_agent_eval:
       name: "[${bundle.target}] job_agent_eval"
+      description: >-
+        Agent/RAG evaluation. Seeds the golden set (contracts.eval_dataset) then
+        evaluates the contract_intelligence agent: deterministic hard gates (PII
+        leak, prompt-injection, citation, retrieval) → ops.eval_results, fail-fast
+        on breach; optional Mosaic AI Agent Evaluation LLM judges. Needs the VS
+        endpoint online + a judge model. Docs: docs/agent-evals.md.
 
       tags:
         platform: commercial-data-platform

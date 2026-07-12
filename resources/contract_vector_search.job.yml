@@ -15,6 +15,12 @@ resources:
   jobs:
     job_contract_vector_search:
       name: "[${bundle.target}] job_contract_vector_search"
+      description: >-
+        Contract RAG ingestion. Contract PDFs (contracts.raw_contract_files volume)
+        → ai_parse_document → chunk + PII-mask → gold_contract_chunks (PK + CDF) →
+        Delta Sync Vector Search index (contract_chunks_index). Tasks: ddl →
+        bronze_ingest → silver_parse_chunk → gold_merge → index_sync. File-arrival
+        triggered. Feeds the contract_intelligence agent. Docs: docs/rag-unstructured.md.
 
       tags:
         platform: commercial-data-platform
