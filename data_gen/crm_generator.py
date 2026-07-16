@@ -66,10 +66,15 @@ CASE_PRIORITIES = ["Low", "Medium", "High", "Critical"]
 CASE_STATUSES = ["New", "In Progress", "Escalated", "Closed"]
 CASE_ORIGINS = ["Phone", "Email", "Web", "Portal"]
 ACTIVITY_TYPES = ["Call", "Email", "Meeting", "Demo", "Follow-up"]
+# Rheinhardt Industrial catalog (sell-side view). Names + prices intentionally
+# mirror erp_generator.PRODUCTS so the CRM<->ERP product crosswalk has something
+# real to match on; CRM deliberately carries only the subset reps actually quote.
 PRODUCTS = [
-    ("Edge Server", 8500.0), ("Rack Server", 14200.0), ("Switch 24p", 3200.0),
-    ("Router XL", 5400.0), ("Centrifugal Pump", 2100.0), ("Ball Valve", 320.0),
-    ("HEPA Filter", 95.0), ("Synthetic Oil 5L", 60.0), ("Gateway Pro", 1800.0),
+    ("Centrifugal Pump", 2100.0), ("Diaphragm Pump", 1650.0), ("Gear Pump", 1400.0),
+    ("Ball Valve", 320.0), ("Gate Valve", 410.0),
+    ("AC Induction Motor", 1850.0), ("Servo Motor", 2400.0),
+    ("Rotary Screw Compressor", 12500.0), ("Reciprocating Compressor", 8900.0),
+    ("HEPA Filter", 95.0), ("Synthetic Oil 5L", 60.0), ("Mechanical Seal Kit", 240.0),
 ]
 
 SALES_NOTE_TEMPLATES = [

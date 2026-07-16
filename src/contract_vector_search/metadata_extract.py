@@ -82,12 +82,25 @@ def extract_contract_id(source_file: str, text: str) -> str | None:
     return m.group(1) if m else None
 
 
-def extract_contract_type(source_file: str, text: str) -> str | None:
-    hay = (_basename(source_file).replace("_", " ") + " " + (text or "")[:2000]).lower()
-    for kw, label in _TYPE_KEYWORDS:
+def _match_type(hay: str) -> str | None:
+    """Longest keyword wins, so specificity decides rather than list order
+    ("pricing agreement" beats "pricing"; "master sales agreement" beats "msa")."""
+    for kw, label in sorted(_TYPE_KEYWORDS, key=lambda kv: -len(kv[0])):
         if kw in hay:
             return label
     return None
+
+
+def extract_contract_type(source_file: str, text: str) -> str | None:
+    """Classify by FILENAME first, body text only as a fallback.
+
+    Contracts routinely *reference* other agreement types in their body — an SLA
+    that "runs concurrently with the Master Sales Agreement", an NDA that protects
+    "customer lists and pricing" — so letting body text outvote the filename
+    misclassifies the document. Docs are named by type; trust that signal first.
+    """
+    fname = _basename(source_file).replace("_", " ").lower()
+    return _match_type(fname) or _match_type((text or "")[:2000].lower())
 
 
 def _first_date(regex: re.Pattern, text: str) -> str | None:

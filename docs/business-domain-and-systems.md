@@ -1,9 +1,20 @@
 # Business Domain & Systems Landscape
 
-**Domain (decided 2026-07-04):** a **B2B industrial-equipment / machinery
-manufacturer** — e.g. pumps, motors, compressors, and spare parts sold to
-**distributors and direct OEM/end-user customers**, with after-sales spare parts,
-warranty, and field service.
+**The company (named 2026-07-15): Rheinhardt Industrial** — a mid-to-large **B2B
+industrial-equipment / machinery manufacturer** selling pumps, valves, motors,
+compressors, and spare parts to **distributors and direct OEM/end-user customers**,
+with after-sales spare parts, warranty, and field service. European heritage
+(matches the DE/GB footprint in the customer data); legal entity in contracts:
+**Rheinhardt Industrial GmbH**.
+
+**Product divisions** (see `data_gen/reference_data_generator.PRODUCT_TREE`):
+
+| Division | Category | Products |
+|---|---|---|
+| **Flow** | Pumps · Valves | Centrifugal / Diaphragm / Gear Pump · Ball / Gate / Check Valve |
+| **Power** | Motors · Compressors | AC Induction Motor · Servo Motor · Rotary Screw / Reciprocating Compressor |
+| **Care** | Filters · Lubricants · Spare Parts | HEPA / Carbon Filter · Synthetic Oil · Grease Cartridge · Mechanical Seal Kit · Bearing Set |
+| **Services** | — | Field service, warranty, installation (profit-center division) |
 
 This retires the earlier oil & gas / commodity-trading framing. **No CTRM/ETRM,
 no market price feeds (Platts/Argus), no cargo/vessel/inspection.** The platform

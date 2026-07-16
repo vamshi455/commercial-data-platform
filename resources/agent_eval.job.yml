@@ -31,15 +31,20 @@ resources:
           default: ${var.catalog}
         - name: vs_endpoint
           default: ${var.vs_endpoint}
+        # MLflow experiment that Runs/Traces/Sessions/Evaluations land in.
+        - name: experiment
+          default: /Users/${workspace.current_user.userName}/cdp_${var.catalog}_agent_eval
 
       # SDKs for retrieval + agent evaluation.
       environments:
         - environment_key: eval_env
           spec:
             client: "2"
+            # Pin floors: Mosaic AI Agent Evaluation (model_type="databricks-agent")
+            # + MLflow-3 tracing/sessions used by run_agent_eval.py need these minimums.
             dependencies:
-              - mlflow
-              - databricks-agents
+              - mlflow>=3.1.3
+              - databricks-agents>=1.1.0
               - databricks-vectorsearch
               - databricks-langchain
 
@@ -58,6 +63,7 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               vs_endpoint: ${var.vs_endpoint}
+              experiment: /Users/${workspace.current_user.userName}/cdp_${var.catalog}_agent_eval
               # Deployed bundle files root so the notebook can import the agent +
               # retriever from sibling dirs (no reliable __file__ in a job notebook).
               source_root: ${workspace.file_path}

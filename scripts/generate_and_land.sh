@@ -66,12 +66,15 @@ case "${TARGET}" in
 esac
 
 LANDING_VOLUME="/Volumes/${CATALOG}/landing/files"
+# Contract PDFs feed the unstructured/RAG lane, which reads a different Volume.
+CONTRACT_VOLUME="/Volumes/${CATALOG}/contracts/raw_contract_files"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 OUT="data_gen/output"
+CONTRACT_OUT="data_gen/output_contracts"   # kept out of ${OUT}: different Volume
 PY="$(command -v python3 || command -v python)"
 
 echo ">> Generating synthetic data into ${OUT} (days=${DAYS} seed=${SEED})"
@@ -81,6 +84,9 @@ echo ">> Generating synthetic data into ${OUT} (days=${DAYS} seed=${SEED})"
 "${PY}" data_gen/crm_generator.py --out "${OUT}/crm" --days "${DAYS}" --seed "${SEED}" --accounts "${ACCOUNTS}"
 "${PY}" data_gen/erp_generator.py --out "${OUT}/erp" --days "${DAYS}" --seed "${SEED}" \
     --customers "${CUSTOMERS}" --crm-out "${OUT}/crm"
+# Contract PDFs (unstructured RAG corpus). Generated OUTSIDE ${OUT} because they
+# land in a different Volume than the CSV landing zone (see upload below).
+"${PY}" data_gen/contract_generator.py --out "${CONTRACT_OUT}"
 
 if [[ "${DO_UPLOAD}" != "true" ]]; then
   echo ">> --no-upload set; generation complete, skipping landing."
@@ -97,4 +103,10 @@ echo ">> Uploading ${OUT} -> ${LANDING_VOLUME} (recursive, overwrite)"
 # then discovers the dt=YYYY-MM-DD partitions under each entity.
 databricks fs cp -r --overwrite "${OUT}" "dbfs:${LANDING_VOLUME}"
 
-echo ">> Landed into ${LANDING_VOLUME} (catalog ${CATALOG}). Done."
+# Contract PDFs -> the contracts Volume (separate from the CSV landing zone).
+# job_contract_vector_search is file-arrival triggered on this path, so landing
+# here kicks off bronze -> silver -> gold -> index_sync.
+echo ">> Uploading ${CONTRACT_OUT} -> ${CONTRACT_VOLUME} (recursive, overwrite)"
+databricks fs cp -r --overwrite "${CONTRACT_OUT}" "dbfs:${CONTRACT_VOLUME}"
+
+echo ">> Landed into ${LANDING_VOLUME} + ${CONTRACT_VOLUME} (catalog ${CATALOG}). Done."

@@ -127,6 +127,37 @@ def test_effective_date_extracted():
     assert m.effective_date == "2025-04-01"
 
 
+def test_filename_type_beats_a_type_mentioned_in_the_body():
+    # An SLA that references the MSA in its body must stay a Warranty/SLA — the
+    # filename is authoritative. (Regression: body text used to outvote it.)
+    m = meta.extract_metadata(
+        "/v/06_Warranty_SLA_Agreement_TD-2025-0210.pdf",
+        "This Agreement runs concurrently with the Master Sales Agreement.",
+    )
+    assert m.contract_type == "Warranty / SLA"
+
+
+def test_nda_not_misread_as_pricing_when_body_mentions_pricing():
+    # NDAs protect "customer lists and pricing" — must not classify as Pricing.
+    m = meta.extract_metadata(
+        "/v/05_Non-Disclosure_Agreement_EX-2025-0076.pdf",
+        "Confidential Information includes customer lists, and pricing.",
+    )
+    assert m.contract_type == "NDA"
+
+
+def test_longest_keyword_wins_over_list_order():
+    # "pricing agreement" must beat the shorter "pricing" alias.
+    m = meta.extract_metadata("/v/04_Pricing_Agreement_CD-2025-0233.pdf", "body")
+    assert m.contract_type == "Pricing Agreement"
+
+
+def test_body_text_still_classifies_when_filename_is_uninformative():
+    # Scanned/opaque filename -> fall back to the body.
+    m = meta.extract_metadata("/v/scan_0001.pdf", "This Distributor Agreement is made ...")
+    assert m.contract_type == "Distributor Agreement"
+
+
 # --------------------------------------------------------------------------- #
 # config
 # --------------------------------------------------------------------------- #
@@ -145,5 +176,30 @@ def test_config_defaults_and_overrides():
     assert c.checkpoint("bronze") == "/Volumes/cdp_prod/contracts/checkpoints/bronze"
 
 
+# --------------------------------------------------------------------------- #
+# page numbers (criterion 5b — docs/agent-evals.md)
+# --------------------------------------------------------------------------- #
+@pytest.mark.xfail(strict=True, reason=(
+    "_page_for in 02_silver_parse_chunk.py is a stub that always returns 1, so every "
+    "citation's page is fabricated (docs/agent-evals.md criterion 5). Remove xfail once "
+    "real page extraction lands."))
+def test_page_for_is_not_a_constant_stub():
+    import ast
+    silver = os.path.join(_MODULE_DIR, "02_silver_parse_chunk.py")
+    with open(silver, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    fn = next((n for n in ast.walk(tree)
+               if isinstance(n, ast.FunctionDef) and n.name == "_page_for"), None)
+    assert fn is not None, "_page_for not found"
+    # A real implementation has more than a single `return <constant>` statement.
+    body = [s for s in fn.body if not isinstance(s, ast.Expr)]  # drop the docstring
+    is_constant_stub = (
+        len(body) == 1
+        and isinstance(body[0], ast.Return)
+        and isinstance(body[0].value, ast.Constant)
+    )
+    assert not is_constant_stub, "page number is hardcoded — citations are fabricated"
+
+
 if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-v"]))
+    raise SystemExit(pytest.main([__file__, "-v", "-rxX"]))

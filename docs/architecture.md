@@ -38,7 +38,13 @@ These systems answer different questions and rarely agree on identifiers, granul
 
 ## 2. Business Context
 
-The company is a mid-to-large IT vendor with a direct sales motion plus a services arm. Its commercial lifecycle spans both systems:
+The company is **Rheinhardt Industrial** — a mid-to-large **B2B industrial-equipment
+manufacturer** (pumps, valves, motors, compressors + aftermarket parts) selling to
+distributors and direct OEM/end-user customers, with a field-service and spare-parts
+arm. Product divisions: **Flow** (pumps, valves) · **Power** (motors, compressors) ·
+**Care** (filters, lubricants, spare parts) · **Services**. See
+[`business-domain-and-systems.md`](./business-domain-and-systems.md). Its commercial
+lifecycle spans both systems:
 
 ```
    Marketing/SDR        Sales            Deal Desk         Fulfillment        Finance           Success

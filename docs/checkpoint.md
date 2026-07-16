@@ -4,6 +4,61 @@ Running list of parked/pending threads to pick up. Newest first.
 
 ## ⏳ PENDING
 
+### Agent lifecycle (DEV→QA→STAGING→PROD) — gap analysis + testing criteria (2026-07-15)
+Audited `contract_intelligence` against the standard agent lifecycle. **DEV + QA spine is in
+place; PROD observability is absent and the eval is not a deployment gate.**
+
+**Done this pass:** MLflow wiring in [`run_agent_eval.py`](../src/evals/run_agent_eval.py) —
+`set_experiment` + `@mlflow.trace` per question + session grouping + run metrics +
+`mlflow.evaluate(model_type="databricks-agent")` (built-in judges). Golden rows extracted to
+pure [`golden_set.py`](../src/evals/golden_set.py) (shared by notebook + pytest). Page-aware
+`citation_accuracy_paged` + `extract_citation_pairs` in `custom_judges.py`. Eval job deps
+pinned (`mlflow>=3.1.3`, `databricks-agents>=1.1.0`). **8 acceptance criteria** documented in
+[`agent-evals.md` §5A](agent-evals.md) and enforced off-cluster (81 passed / 6 xfail).
+
+**Domain pivot CLOSED (2026-07-15):** company named **Rheinhardt Industrial** (GmbH; Munich).
+Product catalog retired the IT-vendor residue (Edge Server/Switch/Router) → divisions **Flow**
+(pumps, valves) · **Power** (motors, compressors) · **Care** (filters, lubricants, spare parts)
+· Services, across `reference_data_generator` + `erp_generator` + `crm_generator` (CRM had its
+own stale list — would have poisoned the product crosswalk). New
+[`data_gen/contract_generator.py`](../data_gen/contract_generator.py) generates the 6-doc
+contract corpus (MSA/Distributor/Supply/Pricing/NDA/Warranty-SLA) as **real PDFs from pure
+stdlib** — corpus is now reproducible + version-controlled (was: hand-dropped, unauditable).
+Golden set reframed → **criterion 2 closed**. `architecture.md` no longer says "IT vendor".
+**Bug found + fixed:** `metadata_extract.extract_contract_type` merged filename+body into one
+haystack and returned the first list-order match, so an SLA citing "Master Sales Agreement" or
+an NDA citing "pricing" misclassified — the oil corpus hid it (matched nothing → always None).
+Now filename-first, longest-keyword-wins, +4 regression tests.
+**Contracts land in a separate Volume** (`contracts/raw_contract_files`, not `landing/files`) —
+generated to `data_gen/output_contracts/` outside `${OUT}` so the landing sweep can't grab them.
+
+**4 audit gaps still tracked as `xfail(strict=True)`** (flip to XPASS → loud CI fail when fixed):
+1. `expected_chunk_ids` all empty → retrieval recall/precision/MRR **dead**. (Backfill after
+   the first index_sync — chunk_ids are only knowable once the corpus is indexed.)
+3. **PII masking advertised in 5 places, implemented nowhere** — expected
+   `src/contract_vector_search/masking.py::mask_pii`. Pipeline would fail its own PII gate.
+4. Served/eval divergence — `model.py._retrieve` has no `query_type` (pure vector) while
+   `retriever.py` uses HYBRID. Prod ≠ what we score.
+5. `_page_for` always returns `1` → every citation's page fabricated.
+
+**Lifecycle gaps (priority order):**
+1. **Eval not a deploy gate** — `ci.yml` runs `pytest` only; `job_agent_eval` is NOT in
+   deploy-qa/prod. Promotion is not gated on eval thresholds. ← cheapest, highest value.
+2. **Inference Tables OFF** — no `auto_capture` on the serving endpoint; prod prompts/
+   responses/latency not logged to Delta. Prod is blind.
+3. **No Lakehouse Monitoring** — nothing watches drift/quality/toxicity (needs #2 first).
+4. **No HITL feedback capture** — `agents.deploy` spins up a Review App but no feedback is
+   persisted or fed back into the golden set.
+5. **Feedback loop not closed** — no alerting; prod failures don't route back to DEV.
+6. Minor: prompts duplicated + unversioned (no MLflow Prompt Registry); no
+   Champion/Challenger UC aliases for staged rollout/rollback.
+
+**Not gaps:** UC registry, scale-to-zero serving, prod manual-approval gate, DAB-as-IaC
+(Terraform equivalent), LLM-judge + deterministic gates, MLflow tracing.
+**Over-engineering note (same audit):** custom 154-line chunker reimplements a shipped lib;
+SCD amendment/versioning likely never fires; streaming bronze for ~11 chunks / 5 PDFs.
+See also: `agent-evals.md`, plan at `~/.claude/plans/lets-go-to-plan-soft-cat.md`.
+
 ### Agentic actions (beyond BI) — collections agent LIVE & GREEN (2026-07-10)
 Flagship monitor→diagnose→draft→HITL→learn loop working in dev. `job_collections_agent`
 (ddl→seed→run): scans `gold.collections_risk` → detects actionable (rules) → LLM

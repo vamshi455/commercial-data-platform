@@ -42,18 +42,24 @@ COUNTRIES: list[dict[str, str]] = [
     {"country_code": "IN", "country_name": "India", "currency": "INR", "region": "APAC"},
 ]
 
+# Rheinhardt Industrial's catalog — a B2B industrial-equipment manufacturer.
+# Three product divisions mirror the business: Flow (pumps + valves), Power
+# (motors + compressors), Care (aftermarket consumables + spare parts). The
+# retired "Hardware" (Edge Server / Switch / Router) division was IT-vendor
+# residue from the pre-2026-07-04 framing — see docs/business-domain-and-systems.md.
 PRODUCT_TREE: dict[str, dict[str, list[str]]] = {
-    "Hardware": {
-        "Compute": ["Edge Server", "Rack Server", "Controller Unit"],
-        "Networking": ["Switch 24p", "Router XL", "Gateway Pro"],
-    },
-    "Industrial": {
-        "Pumps": ["Centrifugal Pump", "Diaphragm Pump"],
+    "Flow": {
+        "Pumps": ["Centrifugal Pump", "Diaphragm Pump", "Gear Pump"],
         "Valves": ["Ball Valve", "Gate Valve", "Check Valve"],
     },
-    "Consumables": {
+    "Power": {
+        "Motors": ["AC Induction Motor", "Servo Motor"],
+        "Compressors": ["Rotary Screw Compressor", "Reciprocating Compressor"],
+    },
+    "Care": {
         "Filters": ["HEPA Filter", "Carbon Filter"],
         "Lubricants": ["Synthetic Oil 5L", "Grease Cartridge"],
+        "Spare Parts": ["Mechanical Seal Kit", "Bearing Set"],
     },
 }
 

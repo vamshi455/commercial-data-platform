@@ -16,9 +16,15 @@ venv/
 
 # Synthetic data output (generated locally, never commit)
 data_gen/output/
+# Contract PDFs live outside data_gen/output/ (different landing Volume) but are
+# equally regenerable — data_gen/contract_generator.py is the versioned artifact.
+data_gen/output_contracts/
 *.parquet
 *.csv.gz
 landing/
+
+# Claude Code local (per-machine) settings
+.claude/settings.local.json
 
 # IDE / OS
 .idea/

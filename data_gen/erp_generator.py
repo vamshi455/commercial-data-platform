@@ -60,16 +60,23 @@ PAYMENT_OUTCOMES = ["on_time", "late", "partial", "disputed", "open"]
 PAYMENT_WEIGHTS = [0.55, 0.20, 0.10, 0.05, 0.10]
 
 PRODUCTS = [
-    # (material_desc, base_price, division, profit_center_seed)
-    ("Edge Server", 8500.0, "Hardware"),
-    ("Rack Server", 14200.0, "Hardware"),
-    ("Switch 24p", 3200.0, "Hardware"),
-    ("Router XL", 5400.0, "Hardware"),
-    ("Centrifugal Pump", 2100.0, "Industrial"),
-    ("Ball Valve", 320.0, "Industrial"),
-    ("HEPA Filter", 95.0, "Consumables"),
-    ("Synthetic Oil 5L", 60.0, "Consumables"),
-    ("Gateway Pro", 1800.0, "Hardware"),
+    # (material_desc, base_price, division) — Rheinhardt Industrial catalog.
+    # Divisions/names must stay in sync with reference_data_generator.PRODUCT_TREE.
+    # Capital equipment (Flow/Power) carries the revenue; Care is the recurring
+    # aftermarket that makes spare-parts/warranty/field-service analytics real.
+    ("Centrifugal Pump", 2100.0, "Flow"),
+    ("Diaphragm Pump", 1650.0, "Flow"),
+    ("Gear Pump", 1400.0, "Flow"),
+    ("Ball Valve", 320.0, "Flow"),
+    ("Gate Valve", 410.0, "Flow"),
+    ("AC Induction Motor", 1850.0, "Power"),
+    ("Servo Motor", 2400.0, "Power"),
+    ("Rotary Screw Compressor", 12500.0, "Power"),
+    ("Reciprocating Compressor", 8900.0, "Power"),
+    ("HEPA Filter", 95.0, "Care"),
+    ("Synthetic Oil 5L", 60.0, "Care"),
+    ("Mechanical Seal Kit", 240.0, "Care"),
+    ("Bearing Set", 130.0, "Care"),
 ]
 
 GL_ACCOUNTS = {
@@ -123,7 +130,7 @@ def gen_cost_centers(rng, n: int, batch_dates: list[date]) -> list[dict[str, Any
 
 
 def gen_profit_centers(rng, n: int) -> list[dict[str, Any]]:
-    divisions = ["Hardware", "Industrial", "Consumables", "Services"]
+    divisions = ["Flow", "Power", "Care", "Services"]
     rows = []
     for i in range(n):
         rows.append({
