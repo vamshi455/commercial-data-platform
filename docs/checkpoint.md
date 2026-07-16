@@ -32,14 +32,22 @@ Now filename-first, longest-keyword-wins, +4 regression tests.
 **Contracts land in a separate Volume** (`contracts/raw_contract_files`, not `landing/files`) —
 generated to `data_gen/output_contracts/` outside `${OUT}` so the landing sweep can't grab them.
 
-**4 audit gaps still tracked as `xfail(strict=True)`** (flip to XPASS → loud CI fail when fixed):
-1. `expected_chunk_ids` all empty → retrieval recall/precision/MRR **dead**. (Backfill after
-   the first index_sync — chunk_ids are only knowable once the corpus is indexed.)
-3. **PII masking advertised in 5 places, implemented nowhere** — expected
-   `src/contract_vector_search/masking.py::mask_pii`. Pipeline would fail its own PII gate.
-4. Served/eval divergence — `model.py._retrieve` has no `query_type` (pure vector) while
-   `retriever.py` uses HYBRID. Prod ≠ what we score.
-5. `_page_for` always returns `1` → every citation's page fabricated.
+**Criteria 3 + 4 CLOSED (2026-07-15).** `masking.py::mask_pii` now masks emails/phones in
+**silver, pre-embedding** (metadata still extracted from raw text first — the counterparty/date
+regexes need it). Deliberately NOT sharing regexes with `custom_judges.detect_pii_leak`: a
+detector sharing the masker's blind spots can't catch the masker's bugs; a test asserts they
+agree instead. Contract ids / ISO dates / money survive masking (only 10–15-digit runs are
+phones). `model.py._retrieve` now passes `query_type="HYBRID"`, and its SYSTEM_PROMPT was
+re-synced byte-identical to `agent.py` (it had been condensed — dropping "or use outside
+knowledge" + the SCOPE list — so **evals graded a prompt nobody was served**). Duplication is
+tolerated (a served artifact can't import repo siblings without `code_paths`) but drift is now
+locked by `test_served_and_evaluated_prompts_are_identical`. → **93 passed, 2 xfailed.**
+
+**2 audit gaps left — both need a live pipeline run, not code:**
+1. `expected_chunk_ids` all empty → retrieval recall/precision/MRR **dead**. Backfill after the
+   first `index_sync` — chunk_ids are `sha256(source_file:seq)`, unknowable until indexed.
+5. `_page_for` always returns `1` → every citation's page fabricated. Needs real paging out of
+   `ai_parse_document`.
 
 **Lifecycle gaps (priority order):**
 1. **Eval not a deploy gate** — `ci.yml` runs `pytest` only; `job_agent_eval` is NOT in

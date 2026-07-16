@@ -7,7 +7,8 @@
 > **Status:** harness **built** — deterministic scorers ([`custom_judges.py`](../src/evals/custom_judges.py)),
 > golden set ([`golden_set.py`](../src/evals/golden_set.py) → `eval_dataset_seed.py`), MLflow run
 > ([`run_agent_eval.py`](../src/evals/run_agent_eval.py)), job `job_agent_eval`. Acceptance criteria are
-> enforced off-cluster by pytest (§5A); five are tracked open gaps (xfail). **Prereqs to run the live
+> enforced off-cluster by pytest (§5A); **2 open gaps** remain (xfail) and both need a live
+> pipeline run rather than code. **Prereqs to run the live
 > job:** VS endpoint online + a judge model-serving endpoint (see §8).
 > **Related:** [`rag-unstructured.md`](./rag-unstructured.md), [`agents.md`](./agents.md),
 > [`../src/contract_vector_search/`](../src/contract_vector_search/).
@@ -162,18 +163,21 @@ marker's removal. That is the tracking mechanism for the audit findings.
 |---|---|---|---|---|
 | 1 | Every `retrieval`/`groundedness` golden row has ≥1 `expected_chunk_ids` | Hard | `test_eval_dataset_contract.py` | **xfail** — not backfilled |
 | 2 | Golden categories recognized; content rows map to `metadata_extract._TYPE_KEYWORDS` | Hard | `test_eval_dataset_contract.py` | ✅ **closed 2026-07-15** — set reframed to the Rheinhardt corpus |
-| 3 | Silver `chunk_text` is PII-masked (`masking.mask_pii`, passes `detect_pii_leak`) | Hard | `test_pii_masking.py` | **xfail** — masking not implemented |
-| 4 | Served `model.py._retrieve` uses `query_type="HYBRID"` + `is_current` (parity with retriever) | Hard | `test_agent_retrieval_parity.py` | **xfail** — served path is pure-vector |
+| 3 | Silver `chunk_text` is PII-masked (`masking.mask_pii`, passes `detect_pii_leak`) | Hard | `test_pii_masking.py` | ✅ **closed 2026-07-15** |
+| 4 | Served `model.py._retrieve` uses `query_type="HYBRID"` + `is_current`; served prompt == evaluated prompt | Hard | `test_agent_retrieval_parity.py` | ✅ **closed 2026-07-15** |
 | 5 | Page-aware citation accuracy; real page numbers (not the `_page_for` stub) | Hard | `test_custom_judges.py` (scorer) + `test_contract_vector_search.py` (`_page_for`) | scorer pass / **page xfail** |
 | 6 | ≥1 golden row per safety lane (scope, injection, pii, empty) | Soft | `test_eval_dataset_contract.py` | pass |
 | 7 | Golden set covers both content and safety lanes | Soft | `test_eval_dataset_contract.py` | pass |
 | 8 | All deterministic hard-gate scorers green on a clean fixture (regression lock) | Hard | `test_custom_judges.py` | pass |
 
-**Open gaps (xfail):** unbackfilled `expected_chunk_ids` (1), missing PII masking (3),
-served-vs-eval retrieval divergence (4), fabricated page numbers (5). Each xfail reason names
-the fix that clears it. **Closed:** criterion 2 — the corpus + golden set were reframed to the
-Rheinhardt Industrial domain (2026-07-15), and the contracts are now generated/reproducible via
-`data_gen/contract_generator.py`.
+**Open gaps (xfail) — both need a live pipeline run, not code:** unbackfilled
+`expected_chunk_ids` (1: chunk ids are `sha256(source_file:seq)`, knowable only after
+`index_sync`) and fabricated page numbers (5: needs real paging out of `ai_parse_document`).
+
+**Closed 2026-07-15:** criterion 2 (corpus + golden set reframed to Rheinhardt Industrial;
+contracts now reproducible via `data_gen/contract_generator.py`), criterion 3 (`masking.mask_pii`
+applied in silver pre-embedding), criterion 4 (served path now HYBRID **and** its system prompt
+is locked byte-identical to the evaluated one — they had drifted).
 
 ---
 

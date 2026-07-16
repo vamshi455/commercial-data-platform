@@ -20,6 +20,7 @@ import pytest
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.abspath(os.path.join(_HERE, os.pardir, os.pardir))
 _MODEL = os.path.join(_ROOT, "agents", "contract_intelligence", "model.py")
+_AGENT = os.path.join(_ROOT, "agents", "contract_intelligence", "agent.py")
 
 # Governance/metadata columns the eval retriever (retriever.py) pulls back.
 GOVERNANCE_COLUMNS = [
@@ -56,13 +57,40 @@ def test_served_retrieval_pulls_governance_columns():
     assert not missing, f"served retrieval omits governance columns: {missing}"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "model.py._retrieve calls similarity_search with no query_type -> pure vector, "
-    "while retriever.py uses query_type='HYBRID'. Served agent diverges from the "
-    "evaluated path (docs/agent-evals.md criterion 4). Remove xfail once model.py "
-    "reuses the shared retriever / passes HYBRID."))
-def test_served_retrieval_is_hybrid():
+def test_served_retrieval_is_hybrid():  # criterion 4 — CLOSED 2026-07-15
+    """The served path must use the same HYBRID search the eval harness scores."""
     assert "HYBRID" in _retrieve_source()
+
+
+# --------------------------------------------------------------------------- #
+# Prompt parity — the other half of "served == evaluated"
+# --------------------------------------------------------------------------- #
+def _system_prompt(path: str) -> str:
+    """Extract SYSTEM_PROMPT's literal value without importing the module."""
+    with open(path, encoding="utf-8") as fh:
+        src = fh.read()
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "SYSTEM_PROMPT" for t in node.targets
+        ):
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                return node.value.value
+    raise AssertionError(f"no SYSTEM_PROMPT string literal in {path}")
+
+
+def test_served_and_evaluated_prompts_are_identical():
+    """agent.py is the prompt evals score; model.py is the prompt users get.
+
+    They are duplicated because a served artifact must not import repo siblings
+    without code_paths — so this test is what prevents drift. They previously
+    diverged (model.py had been condensed, dropping "or use outside knowledge"
+    and the SCOPE list), meaning the eval graded a prompt nobody was served.
+    """
+    assert _system_prompt(_AGENT) == _system_prompt(_MODEL), (
+        "SYSTEM_PROMPT drifted between agent.py (evaluated) and model.py (served) "
+        "— the eval no longer describes the shipped agent. Re-sync them."
+    )
 
 
 if __name__ == "__main__":

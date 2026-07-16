@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) if "__file__" in dir(
 from config import from_widgets           # noqa: E402
 from chunking import chunk_text, make_chunk_id  # noqa: E402  (make_chunk_id used in gold)
 from metadata_extract import extract_metadata   # noqa: E402
+from masking import mask_pii                    # noqa: E402  (PII masked pre-embedding)
 
 from pyspark.sql import functions as F, Row, types as T  # noqa: E402
 
@@ -85,7 +86,11 @@ for path in files:
         if not text or not text.strip():
             failed_rows.append(Row(source_file=path, error="empty_parse"))
             continue
+        # Metadata is extracted from the RAW text (counterparty/date regexes need
+        # the original), but everything downstream of here — chunks, embeddings,
+        # retrieved context, agent answers — sees only the masked text.
         meta = extract_metadata(path, text)
+        text = mask_pii(text)
         for ch in chunk_text(text):
             page = _page_for(parsed, ch.seq)
             parsed_rows.append(Row(
