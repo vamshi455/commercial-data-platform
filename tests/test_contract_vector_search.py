@@ -122,6 +122,27 @@ def test_contract_id_falls_back_to_text():
     assert m.contract_id == "EX-2025-0076"
 
 
+def test_counterparty_survives_a_pdf_line_wrap():
+    """Real PDFs hard-wrap prose, so the parties clause spans lines. The bare
+    newline used to terminate the regex, truncating "Caldwell Engineering
+    Partners" to "Caldwell"."""
+    text = ("This NDA (the \"Agreement\") is made by and between Rheinhardt "
+            "Industrial GmbH and Caldwell\nEngineering Partners.")
+    assert meta.extract_counterparty(text) == "Caldwell Engineering Partners"
+
+
+def test_counterparty_still_bounded_by_a_paragraph_break():
+    # A blank line is a real boundary — it must still stop the match.
+    text = ("made by and between Rheinhardt Industrial GmbH and Onyx Logistics GmbH\n\n"
+            "ARTICLE I - SCOPE")
+    assert meta.extract_counterparty(text) == "Onyx Logistics GmbH"
+
+
+def test_counterparty_unwrapped_single_line():
+    text = "made by and between Rheinhardt Industrial GmbH and Vertex Components AG."
+    assert meta.extract_counterparty(text) == "Vertex Components AG"
+
+
 def test_effective_date_extracted():
     m = meta.extract_metadata("f.pdf", "This agreement, Effective Date: 2025-04-01, between ...")
     assert m.effective_date == "2025-04-01"
@@ -179,26 +200,20 @@ def test_config_defaults_and_overrides():
 # --------------------------------------------------------------------------- #
 # page numbers (criterion 5b — docs/agent-evals.md)
 # --------------------------------------------------------------------------- #
-@pytest.mark.xfail(strict=True, reason=(
-    "_page_for in 02_silver_parse_chunk.py is a stub that always returns 1, so every "
-    "citation's page is fabricated (docs/agent-evals.md criterion 5). Remove xfail once "
-    "real page extraction lands."))
-def test_page_for_is_not_a_constant_stub():
+def test_silver_uses_real_page_extraction_not_a_stub():  # criterion 5 — CLOSED 2026-07-16
+    """Silver must derive pages from the parser (parsing.page_for_chunk), not a
+    hardcoded constant. `_page_for` used to `return 1` forever, so every citation's
+    page was fiction. Page logic + its tests now live in tests/test_contract_parsing.py.
+    """
     import ast
     silver = os.path.join(_MODULE_DIR, "02_silver_parse_chunk.py")
     with open(silver, encoding="utf-8") as fh:
-        tree = ast.parse(fh.read())
-    fn = next((n for n in ast.walk(tree)
-               if isinstance(n, ast.FunctionDef) and n.name == "_page_for"), None)
-    assert fn is not None, "_page_for not found"
-    # A real implementation has more than a single `return <constant>` statement.
-    body = [s for s in fn.body if not isinstance(s, ast.Expr)]  # drop the docstring
-    is_constant_stub = (
-        len(body) == 1
-        and isinstance(body[0], ast.Return)
-        and isinstance(body[0].value, ast.Constant)
-    )
-    assert not is_constant_stub, "page number is hardcoded — citations are fabricated"
+        src = fh.read()
+    assert "page_for_chunk" in src, "silver no longer derives real page numbers"
+    tree = ast.parse(src)
+    stub = next((n for n in ast.walk(tree)
+                 if isinstance(n, ast.FunctionDef) and n.name == "_page_for"), None)
+    assert stub is None, "the _page_for constant stub is back — citations would be fabricated"
 
 
 if __name__ == "__main__":

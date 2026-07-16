@@ -15,6 +15,9 @@ from config import from_widgets           # noqa: E402
 from chunking import chunk_text, make_chunk_id  # noqa: E402  (make_chunk_id used in gold)
 from metadata_extract import extract_metadata   # noqa: E402
 from masking import mask_pii                    # noqa: E402  (PII masked pre-embedding)
+from parsing import (                           # noqa: E402
+    extract_elements, elements_to_text, build_page_map, page_for_chunk,
+)
 
 from pyspark.sql import functions as F, Row, types as T  # noqa: E402
 
@@ -24,31 +27,10 @@ spark.conf.set("spark.sql.shuffle.partitions", "8")  # noqa: F821  (small doc vo
 
 # COMMAND ----------
 # ---- helpers (defined first so later cells can call them) ------------------
-def _extract_text(parsed) -> str:
-    """Pull concatenated text out of the ai_parse_document result struct.
-
-    The result shape can vary by runtime version; we defensively look for the
-    common fields (document.text / pages[].content) and fall back to str().
-    """
-    if parsed is None:
-        return ""
-    try:
-        d = parsed.asDict(recursive=True) if hasattr(parsed, "asDict") else dict(parsed)
-    except Exception:
-        return str(parsed)
-    doc = d.get("document") or d
-    if isinstance(doc, dict):
-        if doc.get("text"):
-            return doc["text"]
-        pages = doc.get("pages") or d.get("pages")
-        if isinstance(pages, list):
-            return "\n\n".join(str(p.get("content") or p.get("text") or "") for p in pages)
-    return str(d)
-
-
-def _page_for(parsed, seq: int) -> int:
-    """Best-effort page number; defaults to 1 when the parser omits paging."""
-    return 1
+# Text + page extraction lives in the pure `parsing` module (unit-tested
+# off-cluster). It raises ParseShapeError rather than str()-ing an unrecognized
+# result — the old inline helper's silent fallback wrote raw parse JSON into
+# chunk_text, so every embedding/citation was built from JSON, not prose.
 
 
 # COMMAND ----------
@@ -81,18 +63,21 @@ for path in files:
             args={"p": path},
         )
         parsed = df.collect()[0]["parsed"]
-        # ai_parse_document returns a struct; text lives under document/pages.
-        text = _extract_text(parsed)
-        if not text or not text.strip():
+        # [(text, page)] — page comes from elements[].bbox[].page_id, so chunk
+        # citations carry the real page rather than a hardcoded 1.
+        elements = extract_elements(parsed)
+        if not elements:
             failed_rows.append(Row(source_file=path, error="empty_parse"))
             continue
-        # Metadata is extracted from the RAW text (counterparty/date regexes need
-        # the original), but everything downstream of here — chunks, embeddings,
-        # retrieved context, agent answers — sees only the masked text.
-        meta = extract_metadata(path, text)
-        text = mask_pii(text)
+        # Metadata comes from the RAW text (the counterparty/date regexes need the
+        # original). Masking is applied PER ELEMENT so the page-offset map stays
+        # aligned with the masked text everything downstream actually sees.
+        meta = extract_metadata(path, elements_to_text(elements))
+        elements = [(mask_pii(t), p) for t, p in elements]
+        text = elements_to_text(elements)
+        page_map = build_page_map(elements)
         for ch in chunk_text(text):
-            page = _page_for(parsed, ch.seq)
+            page = page_for_chunk(text, page_map, ch.text)
             parsed_rows.append(Row(
                 source_file=path, chunk_seq=ch.seq, chunk_text=ch.text, page_number=page,
                 contract_id=meta.contract_id, counterparty=meta.counterparty,

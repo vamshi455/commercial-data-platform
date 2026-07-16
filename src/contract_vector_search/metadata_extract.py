@@ -108,8 +108,20 @@ def _first_date(regex: re.Pattern, text: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _unwrap(text: str) -> str:
+    """Join line-wrapped prose, keeping paragraph breaks.
+
+    PDF text arrives hard-wrapped at the column width, so a parties clause reads
+    "...and Caldwell\\nEngineering Partners." Since _PARTIES_RE terminates on
+    [.,\\n], the bare newline cut the counterparty to "Caldwell". A SINGLE newline
+    is a line wrap (join it); a BLANK line is a real paragraph break (keep it, so
+    it still bounds the match).
+    """
+    return re.sub(r"(?<!\n)\n(?!\n)", " ", text or "")
+
+
 def extract_counterparty(text: str) -> str | None:
-    m = _PARTIES_RE.search(text or "")
+    m = _PARTIES_RE.search(_unwrap(text))
     if not m:
         return None
     # Return the second named party as the counterparty; trim legal noise.

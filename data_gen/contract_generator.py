@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import textwrap
 from dataclasses import dataclass
 
 # --------------------------------------------------------------------------- #
@@ -61,7 +62,30 @@ def _content_stream(lines: list[str]) -> bytes:
     return "\n".join(out).encode("latin-1", "replace")
 
 
+# Helvetica 10pt averages ~5pt/char, and the text column is 612 - 2*72 = 468pt,
+# so ~93 chars fit. Unwrapped lines silently run off the right edge and the PDF
+# parser truncates them mid-word (that is how "Halstead Manufacturing Inc."
+# reached the index as "Halstead Manufacturi"). Wrap before drawing.
+_MAX_CHARS = 92
+
+
+def _wrap(lines: list[str]) -> list[str]:
+    """Wrap to the text column, preserving blank lines and leading indent."""
+    out: list[str] = []
+    for line in lines:
+        if len(line) <= _MAX_CHARS:
+            out.append(line)
+            continue
+        indent = " " * (len(line) - len(line.lstrip(" ")))
+        out.extend(textwrap.wrap(
+            line, width=_MAX_CHARS, subsequent_indent=indent,
+            break_long_words=False, break_on_hyphens=False,
+        ) or [line])
+    return out
+
+
 def _paginate(lines: list[str]) -> list[list[str]]:
+    lines = _wrap(lines)
     return [lines[i:i + _LINES_PER_PAGE] for i in range(0, len(lines), _LINES_PER_PAGE)] or [[""]]
 
 
