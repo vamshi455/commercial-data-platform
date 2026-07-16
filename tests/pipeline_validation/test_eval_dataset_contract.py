@@ -23,6 +23,7 @@ for _p in (_EVALS, _MODULE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import golden_set  # noqa: E402
 from golden_set import (  # noqa: E402
     COLUMNS, CATEGORIES, RETRIEVAL_CATEGORIES, REQUIRED_SAFETY_CATEGORIES, as_dicts,
 )
@@ -62,13 +63,42 @@ def test_suite_covers_content_and_safety_lanes():  # criterion 7
 # --------------------------------------------------------------------------- #
 # Audit gaps — tracked as xfail(strict) until the underlying data is fixed
 # --------------------------------------------------------------------------- #
-@pytest.mark.xfail(strict=True, reason=(
-    "expected_chunk_ids not backfilled -> retrieval recall/precision/MRR are dead "
-    "(docs/agent-evals.md criterion 1). Remove xfail once the golden set is labeled."))
-def test_retrieval_rows_have_ground_truth_chunk_ids():  # criterion 1
+def test_retrieval_rows_have_ground_truth_chunk_refs():  # criterion 1 — CLOSED 2026-07-16
+    """Every scored row declares WHERE its answer lives.
+
+    Refs are (source_file, chunk_seq) — the stable key. eval_dataset_seed.py
+    resolves them to real chunk_ids against gold_contract_chunks and fails loudly
+    on a miss, so a stale golden set can't silently score recall=0.
+    """
     offenders = [r["request"] for r in ROWS
-                 if r["category"] in RETRIEVAL_CATEGORIES and not r["expected_chunk_ids"]]
-    assert not offenders, f"no expected_chunk_ids for: {offenders}"
+                 if r["category"] in RETRIEVAL_CATEGORIES and not r["expected_chunk_refs"]]
+    assert not offenders, f"no expected_chunk_refs for: {offenders}"
+
+
+def test_chunk_refs_are_well_formed():
+    for r in ROWS:
+        for ref in r["expected_chunk_refs"]:
+            assert isinstance(ref, tuple) and len(ref) == 2, f"bad ref {ref!r}"
+            fname, seq = ref
+            assert fname.endswith(".pdf"), f"ref filename not a pdf: {fname}"
+            assert isinstance(seq, int) and seq >= 0, f"bad chunk_seq: {seq!r}"
+
+
+def test_chunk_refs_point_at_documents_the_generator_produces():
+    """Guards the golden set against corpus drift — a ref naming a file that
+    contract_generator.py doesn't emit could never resolve at seed time."""
+    for r in ROWS:
+        for fname, _ in r["expected_chunk_refs"]:
+            assert fname in golden_set.CORPUS_FILES, (
+                f"{fname!r} is not part of the generated corpus")
+
+
+def test_safety_rows_carry_no_refs():
+    """Safety/edge rows aren't scored on retrieval, and several are unanswerable
+    by design — there is no correct chunk to point at."""
+    for r in ROWS:
+        if r["category"] in REQUIRED_SAFETY_CATEGORIES:
+            assert not r["expected_chunk_refs"], f"safety row has refs: {r['request']}"
 
 
 def test_content_rows_reference_known_contract_type():  # criterion 2b — CLOSED 2026-07-15

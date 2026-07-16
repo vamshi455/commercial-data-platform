@@ -72,11 +72,19 @@ def _retrieve(query: str, k: int = 5) -> list[dict]:
     return [dict(zip(cols, r)) for r in rows]
 
 
+def _page_label(page) -> str:
+    """page_number is a Spark double -> "p1.0" leaked into citations; coerce to int."""
+    try:
+        return str(int(float(page)))
+    except (TypeError, ValueError):
+        return "?"
+
+
 def _format_context(hits: list[dict]) -> str:
     out = []
     for h in hits:
         name = (h.get("source_file") or "?").rsplit("/", 1)[-1]
-        out.append(f"[{name} p{h.get('page_number')}]\n{h.get('chunk_text') or ''}")
+        out.append(f"[{name} p{_page_label(h.get('page_number'))}]\n{h.get('chunk_text') or ''}")
     return "\n\n".join(out)
 
 
@@ -103,7 +111,9 @@ class ContractIntelligenceAgent(ChatAgent):
         question = messages[-1].content if messages else ""
         hits = _retrieve(question, k=(custom_inputs or {}).get("k", 5))
         answer = _generate(_format_context(hits), question)
-        citations = re.findall(r"\[([^\]]+?\.(?:pdf|xlsx))", answer)
+        # Accepts "(file.pdf p1)" as well as "[file.pdf p1]" — models emit both,
+        # and a bracket-only regex silently returned zero citations.
+        citations = re.findall(r"[\[(]\s*([^\])]+?\.(?:pdf|xlsx))", answer, re.IGNORECASE)
         return ChatAgentResponse(
             messages=[ChatAgentMessage(role="assistant", content=answer, id="0")],
             custom_outputs={"citations": citations,

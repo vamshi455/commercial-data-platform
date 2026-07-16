@@ -101,6 +101,54 @@ def test_is_refusal():
     assert is_refusal("The termination notice period is 30 days.") is False
 
 
+def test_is_refusal_catches_i_dont_see_phrasing():
+    """VERBATIM from a live Playground answer. The agent correctly declined an
+    unanswerable question, but this phrasing matched none of the original signals,
+    so the edge-empty hard gate would have FAILED a correct refusal."""
+    ans = ('I don\'t see a "spot purchase contract" in the provided context. '
+           "The documents available are: a Master Sales Agreement (CD-2025-0142)...")
+    assert is_refusal(ans) is True
+
+
+def test_is_refusal_other_not_here_phrasings():
+    for a in ("I cannot find that contract in the context.",
+              "There is no such agreement in the provided documents.",
+              "That term does not appear in the retrieved contracts.",
+              "No mention of penalties is present in the context."):
+        assert is_refusal(a) is True, a
+
+
+def test_is_refusal_still_false_for_a_real_answer():
+    # Guard against the widened signal list over-matching a genuine answer.
+    assert is_refusal(
+        "Either party may terminate for convenience upon ninety (90) days notice."
+    ) is False
+
+
+def test_citations_parsed_from_parenthesised_float_page():
+    """VERBATIM shape from a live answer: the model writes "(file.pdf p1.0)" —
+    parens, and a float because page_number is a Spark double. The strict
+    bracket+int regex parsed ZERO citations, and citation_accuracy returns 1.0
+    when nothing is cited, so the hard gate passed while measuring nothing."""
+    ans = ("terminable for convenience with 90 days' notice "
+           "(01_Master_Sales_Agreement_CD-2025-0142.pdf p1.0).")
+    assert extract_citation_pairs(ans) == [("01_Master_Sales_Agreement_CD-2025-0142.pdf", 1)]
+
+
+def test_citations_parsed_from_bracketed_int_page():
+    ans = "Per [apex_msa.pdf p2], the term is 30 days."
+    assert extract_citation_pairs(ans) == [("apex_msa.pdf", 2)]
+
+
+def test_citation_accuracy_no_longer_passes_vacuously_on_real_answers():
+    ans = ("MSA: 90 days (01_Master_Sales_Agreement_CD-2025-0142.pdf p1.0). "
+           "Ghost: (99_Nonexistent_Contract.pdf p1.0).")
+    cited = extract_citation_pairs(ans)
+    assert len(cited) == 2, "both citations must parse"
+    retrieved = [("/v/01_Master_Sales_Agreement_CD-2025-0142.pdf", 1)]
+    assert citation_accuracy_paged(cited, retrieved) == 0.5  # one fabricated
+
+
 def test_retrieval_scores_perfect():
     s = retrieval_scores(["c1", "c2", "c3"], ["c1", "c2"], k=5)
     assert s["recall"] == 1.0

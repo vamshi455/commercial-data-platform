@@ -56,8 +56,16 @@ def citation_accuracy(cited_sources: Iterable[str], retrieved_sources: Iterable[
     return len(grounded) / len(cited)
 
 
-# Citation label as emitted by the agent: "[file.pdf p2]" / "[file.xlsx p12]".
-_CITATION = re.compile(r"\[([^\]]+?\.(?:pdf|xlsx))\s+p(\d+)\]", re.IGNORECASE)
+# Citation label. We ASK for "[file.pdf p2]", but models routinely emit
+# "(file.pdf p2)" mid-sentence, and page_number arrives from Spark as a double,
+# so real answers contain "(file.pdf p1.0)". The strict bracket+int regex parsed
+# ZERO citations from those — and citation_accuracy returns 1.0 when nothing is
+# cited, so the hard gate passed while measuring nothing. Accept both delimiters
+# and a trailing ".0"; be liberal in what the scorer reads.
+_CITATION = re.compile(
+    r"[\[(]\s*([^\])]+?\.(?:pdf|xlsx))\s+p\.?\s*(\d+)(?:\.\d+)?\s*[\])]",
+    re.IGNORECASE,
+)
 
 
 def extract_citation_pairs(answer: str) -> list[tuple[str, int]]:
@@ -111,6 +119,14 @@ def is_refusal(answer: str) -> bool:
         "not able to answer", "no information", "not found", "outside",
         "out of scope", "please contact", "i'm not able", "unable to",
         "not in the provided", "does not contain",
+        # Added after a live miss: the agent correctly declined an unanswerable
+        # question with "I don't see a 'spot purchase contract' in the provided
+        # context", which matched NONE of the above — so the edge-empty gate
+        # would have failed a correct refusal. These are the "it isn't here"
+        # phrasings models actually reach for.
+        "don't see", "do not see", "cannot find", "can't find", "couldn't find",
+        "no such", "not present", "isn't in the", "is not in the",
+        "not available in", "no mention", "not appear",
     )
     return any(s in a for s in signals)
 

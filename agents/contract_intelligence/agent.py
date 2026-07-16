@@ -39,12 +39,25 @@ RULES:
 
 
 # --- pure helpers (unit-tested; no cluster / model needed) ------------------
+def _page_label(page: Any) -> str:
+    """Render page_number for the citation label.
+
+    page_number arrives from Spark as a double, so an f-string produced "p1.0" —
+    which the model faithfully echoed into its citations and the citation regex
+    then failed to parse. Coerce to int so the label reads "p1".
+    """
+    try:
+        return str(int(float(page)))
+    except (TypeError, ValueError):
+        return "?"
+
+
 def format_context(hits: List[Dict[str, Any]]) -> str:
     """Render retrieved chunks into a labeled context block for the prompt."""
     blocks = []
     for h in hits:
         name = (h.get("source_file") or "?").rsplit("/", 1)[-1]
-        page = h.get("page_number")
+        page = _page_label(h.get("page_number"))
         blocks.append(f"[{name} p{page}]\n{h.get('text') or h.get('chunk_text') or ''}")
     return "\n\n".join(blocks)
 
@@ -54,9 +67,15 @@ def build_prompt(context: str, request: str) -> str:
     return f"CONTEXT:\n{context}\n\nQUESTION: {request}"
 
 
+# We ask for "[file.pdf p2]" but models emit "(file.pdf p2)" mid-sentence too;
+# a bracket-only regex silently returned no citations. Keep this in sync with
+# custom_judges._CITATION.
+_CITED = re.compile(r"[\[(]\s*([^\])]+?\.(?:pdf|xlsx))", re.IGNORECASE)
+
+
 def extract_cited_docs(answer: str) -> List[str]:
     """Pull the document names the answer cited via [file.pdf p#] labels."""
-    return re.findall(r"\[([^\]]+?\.(?:pdf|xlsx))", answer or "")
+    return _CITED.findall(answer or "")
 
 
 # --- retrieval + generation (lazy heavy imports) ----------------------------
