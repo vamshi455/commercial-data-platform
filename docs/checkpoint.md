@@ -4,6 +4,53 @@ Running list of parked/pending threads to pick up. Newest first.
 
 ## ⏳ PENDING
 
+### Embedding lifecycle — corpus is APPEND-ONLY (2026-07-16) 🔴
+Full write-up: [embedding-lifecycle.md](embedding-lifecycle.md). Adding docs works; **updating
+and deleting do not**, and all three failures are SILENT — no raise, no dead-letter, no gate.
+The agent keeps serving stale/withdrawn contracts with confident citations.
+
+**Three gates decide processing, and each blocks a different case:**
+- **E3 in-place edit ❌** — Auto Loader checkpoint keys on file **path**, so changed bytes
+  under the same name are never re-read; silver's anti-join on `source_file` blocks it again.
+  A revised contract is invisible. (This is what the A6 "modified PDF shows in agent chat"
+  test depends on — it would fail today.)
+- **E5 delete ❌** — `03_gold_merge` MERGE has no delete branch, so chunks of a removed PDF
+  persist `is_current=true` and stay retrievable **forever**. Proven the hard way: purging the
+  oil corpus needed manual PDF deletes + checkpoint delete + TRUNCATE of 4 tables. No
+  supported purge path exists.
+- **E6 orphans ❌** — re-chunking a doc into fewer chunks leaves the old high-`chunk_seq`
+  chunks behind, still current, still retrievable.
+- Working: E1 new doc ✅, E2 idempotent re-run ✅, E7 dead-letter ✅ (all verified live).
+  E4 amendment logic exists but has **never run live**.
+
+**Design (user constraint 2026-07-16: deletion must NOT force a full load — it doesn't):**
+adding `WHEN NOT MATCHED BY SOURCE DELETE` to the existing MERGE is the trap — on an
+incremental run the staged source only holds this batch, so every other doc gets wiped.
+Correct: **E5** reconciles against the **volume file listing** (cheap metadata, no re-parse,
+no re-embed) → soft-delete (`is_current=false`, keeps the governance audit trail, and the
+retriever already filters it). **E6** guards the delete with
+`t.source_file IN (SELECT source_file FROM staged)` so only files touched this run are
+candidates. Both stay incremental.
+
+### Eval is now HONEST — but `is_refusal` is the wrong mechanism (2026-07-16)
+First meaningful `job_agent_eval` run on the Rheinhardt corpus: **0 PII leaks, 0 injections**
+(real — the corpus carries live emails/phones and masking held). Chunk-ref resolution works
+(criterion 1), `recall@5=1.0` — but **1.0 by construction**: each contract is still one chunk,
+so retrieval cannot miss. Retrieval metrics stay decorative until contracts are long enough
+to split (that is the remaining corpus task).
+
+**⚠️ Caught two false-green scorecards before trusting them:** (1) the first "successful" run
+scored stale deployed code — `bundle deploy` had not been run, so refs were empty and the old
+bracket-only citation regex parsed ZERO citations while `citation_accuracy` reported a perfect
+1.0 ("nothing cited = nothing wrong"). **"Ran successfully" ≠ "measured correctly."**
+(2) `is_refusal` keyword-matching failed twice in two attempts — first on *"I don't see a X in
+the provided context"*, then immediately on *"I don't have access… my scope is limited…
+please consult"* (list has "please contact"). Both were textbook-correct declines scored as
+failures. **Two misses in two tries = wrong tool, not a missing keyword.** Refusal is semantic
+with unbounded phrasings → move it to an **LLM judge** (`guideline_adherence`); keep regex for
+PII and exact-match for the injection canary, where determinism is right. **Until then
+`refused` is advisory, NOT a gate.**
+
 ### Agent lifecycle (DEV→QA→STAGING→PROD) — gap analysis + testing criteria (2026-07-15)
 Audited `contract_intelligence` against the standard agent lifecycle. **DEV + QA spine is in
 place; PROD observability is absent and the eval is not a deployment gate.**

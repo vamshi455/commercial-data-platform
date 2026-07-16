@@ -227,6 +227,66 @@ issue "Testing: high-level agent BEHAVIOR scenarios (distinct from evals)" "A6 B
 
 **Difference from evals:** evals score *how good* an answer is (thresholded, fuzzy); these assert *what the agent does* (pass/fail, deterministic where possible). See docs/agent-evals.md §2D/§4."
 
+issue "Embeddings: support DELETING a PDF (chunks persist in the index forever)" "A1 Agent correctness & safety" \
+  "domain:unstructured,type:governance,priority:P0,status:ready" \
+  "**Governance bug.** \`03_gold_merge.py\`'s MERGE has only WHEN MATCHED / WHEN NOT MATCHED — **no delete branch**. Chunks of a PDF removed from the volume persist with \`is_current=true\` and stay retrievable **forever**. The agent will confidently cite a contract that no longer exists. Proven 2026-07-16: purging the oil corpus required manual PDF deletes + Auto Loader checkpoint delete + TRUNCATE of 4 tables — there is no supported purge path.
+
+**Constraint (user, 2026-07-16): must NOT force a full load.** The trap is adding \`WHEN NOT MATCHED BY SOURCE DELETE\` to the existing MERGE — on an incremental run the staged source holds only this batch, so every other document gets wiped, forcing a full reload every run.
+
+**Correct design:** reconcile against the **volume file listing** (directory listing = cheap metadata; no PDF read, parsed, or re-embedded):
+\`\`\`sql
+MERGE INTO gold_contract_chunks t
+USING (SELECT path AS source_file FROM volume_listing) v ON t.source_file = v.source_file
+WHEN NOT MATCHED BY SOURCE THEN UPDATE SET t.is_current = false;   -- soft delete
+\`\`\`
+Soft delete preferred: the retriever already filters \`is_current=true\` so it takes effect immediately, it keeps the governance audit trail of what was withdrawn and when, and it is reversible.
+
+See docs/embedding-lifecycle.md §4 (E5)."
+
+issue "Embeddings: in-place PDF edits are silently ignored" "A1 Agent correctness & safety" \
+  "domain:unstructured,type:ingestion,priority:P0,status:ready" \
+  "**Silent staleness.** Editing a contract without renaming it is invisible to the pipeline — TWO gates block it: (1) the Auto Loader checkpoint keys on file **path**, so changed bytes under a known name are never re-read; (2) silver anti-joins on \`source_file\`, so even a new bronze row would be skipped. The agent serves the OLD terms indefinitely, with no error and no dead-letter.
+
+**Options:** (a) content-hash the bytes in bronze (it already captures \`content\` + \`modificationTime\`) and re-parse when the hash changes for a known path; (b) anti-join on (source_file, content_hash) instead of source_file alone; (c) convention: never edit in place, always land a new filename — turns this into the amendment path (E4), but a convention is not a control.
+
+Recommend (a)+(b). Blocks the 'modified PDF shows in agent chat' E2E test.
+See docs/embedding-lifecycle.md §4 (E3)."
+
+issue "Embeddings: re-chunking leaves orphaned chunks retrievable" "A1 Agent correctness & safety" \
+  "domain:unstructured,type:ingestion,priority:P1,status:ready" \
+  "If a document re-chunks into FEWER chunks (5 -> 3), the old high-\`chunk_seq\` chunks are never revisited by the MERGE and linger with \`is_current=true\`, still retrievable. Hard-delete is right here (an orphaned chunk is an artifact, not a fact).
+
+Must stay incremental — guard the delete so only files touched this run are candidates:
+\`\`\`sql
+WHEN NOT MATCHED BY SOURCE
+  AND t.source_file IN (SELECT DISTINCT source_file FROM staged_chunks)
+  THEN DELETE
+\`\`\`
+See docs/embedding-lifecycle.md §4 (E6)."
+
+issue "Testing: job_embedding_lifecycle — add/update/amend/delete scenarios" "A6 Behavioral test scenarios" \
+  "domain:unstructured,type:testing,priority:P1,status:ready" \
+  "The eval grades ANSWERS given the index. **Nothing grades the index against the source volume.** Staleness, orphans, and ghost documents all produce fluent, well-cited, confidently WRONG answers that every current metric scores green.
+
+Build \`job_embedding_lifecycle\` (integration, scratch schema) covering the matrix in docs/embedding-lifecycle.md §5:
+- E1 new PDF indexed ✅ (works) · E2 idempotent re-run ✅ · E7 dead-letter ✅
+- **E3 modified PDF re-indexes** ❌ · **E5 deleted PDF leaves index** ❌ · **E6 orphans removed** ❌
+- E4 amendment retires prior ⚠️ (logic exists, never run live) · E8 superseded never retrieved · E10 freshness lag
+
+Start with E5 and E3 — those are the two that make the agent lie."
+
+issue "Evals: move is_refusal from keyword matching to an LLM judge" "A1 Agent correctness & safety" \
+  "domain:agent,type:eval,priority:P1,status:ready" \
+  "**Wrong tool, proven twice in two attempts.** \`custom_judges.is_refusal\` is a keyword list. Patched once to catch *'I don't see a X in the provided context'*; the very next live answer broke it again:
+
+> 'I don't have access to revenue or booking metrics — my scope is limited to contract terms... please consult the revenue_insights agent.'
+
+A textbook decline-and-route, scored **False** (the list has 'please contact', not 'please consult'; nothing for \"don't have access\" or 'my scope is limited'). Both misses were CORRECT agent behavior scored as failure — which would send someone off to 'fix' an agent that was already right.
+
+'Did the agent decline?' is semantic with unbounded phrasings; string matching cannot close it. Move to an LLM judge (Mosaic AI \`guideline_adherence\` fits: 'must decline and route metric questions'). Keep regex for PII and exact-match for the injection canary — determinism is the right tool THERE.
+
+**Until this lands, \`refused\` is advisory, NOT a gate** (edge-empty / safety-scope will under-report correct behavior). See docs/embedding-lifecycle.md §7."
+
 issue "Testing: E2E — modified PDF re-embeds and the agent reflects it" "A6 Behavioral test scenarios" \
   "domain:unstructured,type:testing,priority:P1,status:ready" \
   "**Freshness / amendment E2E — currently untested end to end.** Prove that editing a source document flows all the way through to the agent's answer.
