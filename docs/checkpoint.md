@@ -4,6 +4,15 @@ Running list of parked/pending threads to pick up. Newest first.
 
 ## ⏳ PENDING
 
+### Token/LLM cost is unmeasured (2026-07-16)
+Full write-up: [token-optimization-cost.md](token-optimization-cost.md). No token-count or
+dollar-cost logging exists in `run_agent_eval.py` or `model.py` — per-eval-run and
+per-production-request LLM cost is not captured anywhere today (MLflow traces latency/spans
+only). Also flags a forward-looking risk: `k=5` retrieval was implicitly sized to the current
+1-chunk-per-doc corpus — once contracts are lengthened for real multi-chunk retrieval (see next
+entry), `k` needs re-tuning or context tokens multiply unexamined. Recommended next step: pull
+token-usage off the MLflow trace per eval call and trend it.
+
 ### Embedding lifecycle — corpus is APPEND-ONLY (2026-07-16) 🔴
 Full write-up: [embedding-lifecycle.md](embedding-lifecycle.md). Adding docs works; **updating
 and deleting do not**, and all three failures are SILENT — no raise, no dead-letter, no gate.
@@ -222,3 +231,7 @@ CRM cutover or the MES/PLM/WMS generators.
 ## Related state
 - QA + PROD Databricks workspaces deleted 2026-07-04 (NAT-gateway cost cut).
 - Git: main-only workflow (commit/push straight to main).
+- EOD idle-compute sweep added 2026-07-16: `scripts/check_idle_compute.sh` (docs in
+  `jobs-and-pipelines.md` §7.1) auto-stops idle clusters/warehouses/VS endpoints, flags
+  non-scale-to-zero serving endpoints for review. Scheduled via a session-only Claude Code
+  cron (7-day auto-expiry) — not yet a durable `launchd`/system job.

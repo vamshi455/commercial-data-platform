@@ -169,3 +169,43 @@ dev-mode `${pipeline_development}`.
 - **Dev schedule is paused** by bundle development mode — `job_orchestration_daily` won't fire on
   its cron until deployed to a `production`-mode target.
 - **qa/prod don't exist** — deploy/run only `-t dev` until those workspaces are re-provisioned.
+
+---
+
+## 7. Maintenance scripts (not bundle resources)
+
+These are **not** Databricks Jobs — no `resources/*.yml` entry, nothing to `bundle deploy`. They
+call the `databricks` CLI directly against the live workspace and are meant to be run on-demand
+(or on a local/session schedule) rather than as a deployed Workflow.
+
+### 7.1 `scripts/check_idle_compute.sh` — EOD idle-compute sweep
+**Purpose:** catch anything left running that bills unnecessarily and clean it up before it costs
+overnight. Complements §6 above — that section documents the one *designed* always-on cost
+(`cdp_contracts_vs`); this script is the safety net for anything left on by accident.
+
+| Category | Action if found | Why safe to automate |
+|---|---|---|
+| All-purpose clusters `RUNNING`/`PENDING`/`RESIZING` | `clusters delete` (terminate) | Config kept, restart any time — not a permanent delete |
+| SQL warehouses `RUNNING` | `warehouses stop` | Instant restart, same as above |
+| Vector Search endpoints (any) | `vector-search-endpoints delete-endpoint` | STANDARD endpoints bill always-on regardless of query volume — existence *is* the cost |
+| Model serving endpoints without `scale_to_zero_enabled` | **Flagged only, never deleted** | Deleting a live agent endpoint needs a full redeploy to restore — bigger blast radius than the idle cost it'd save. Foundation-model (`system.ai.*`) endpoints are pay-per-token and skipped entirely. |
+
+**Usage:**
+```
+scripts/check_idle_compute.sh              # live: report + remediate per the table above
+scripts/check_idle_compute.sh --dry-run    # report only, touches nothing
+```
+Exit code `1` if anything was flagged for a human decision (i.e. a non-scale-to-zero serving
+endpoint was found); `0` otherwise.
+
+**Gotcha hit while building it:** `databricks serving-endpoints list` omits
+`scale_to_zero_enabled` from `served_entities` — it's only present on `serving-endpoints get
+<name>`. Checking the `list` output alone produces a false "not scale-to-zero" flag on every
+custom endpoint; the script calls `get` per custom endpoint to read the real value.
+
+**Scheduling:** currently run via a Claude Code session cron (`CronCreate`), **not** a durable
+system job — it lives only in that Claude session's memory, is gone if the session ends, and
+auto-expires after 7 days regardless. For durable daily enforcement, replace with a real
+`launchd`/`cron` entry on the host calling this script directly, or promote it to a Databricks
+Job (it's already pure CLI, so it would need a small compute host or a serverless notebook
+wrapper to run inside the workspace instead of from a local shell).
