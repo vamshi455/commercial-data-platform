@@ -147,6 +147,8 @@ Promotion to `qa` / `prod` is the **same commands with `-t qa` / `-t prod`** —
 | [docs/agents.md](docs/agents.md) | AI agents, what data they may touch, guardrails |
 | [docs/naming-conventions.md](docs/naming-conventions.md) | Catalog/schema/table/column/job naming standards |
 | [docs/project-plan.md](docs/project-plan.md) | 7 phases, deliverables, milestones |
+| [PROGRESS.md](PROGRESS.md) | Day-by-day high-level progress log (updated by EOD) |
+| [docs/token-optimization-cost.md](docs/token-optimization-cost.md) | LLM/embedding token cost map for the RAG agent + eval loop |
 
 ---
 

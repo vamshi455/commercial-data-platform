@@ -235,3 +235,10 @@ CRM cutover or the MES/PLM/WMS generators.
   `jobs-and-pipelines.md` §7.1) auto-stops idle clusters/warehouses/VS endpoints, flags
   non-scale-to-zero serving endpoints for review. Scheduled via a session-only Claude Code
   cron (7-day auto-expiry) — not yet a durable `launchd`/system job.
+- `PROGRESS.md` (repo root) added 2026-07-16: day-by-day high-level progress log, backfilled
+  from full git history. EOD update also scheduled via a session-only Claude Code cron (same
+  7-day-expiry caveat as above) — reads the day's commits, appends one prose entry, commits.
+  GitHub Project https://github.com/users/vamshi455/projects/6 was proposed as an alternative/
+  addition but is blocked: `gh` is not authenticated in this environment (`gh auth login`
+  needed, plus the `project` scope specifically for Projects v2 — default login doesn't grant
+  it).
