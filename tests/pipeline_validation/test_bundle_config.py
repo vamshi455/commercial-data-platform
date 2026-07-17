@@ -87,6 +87,55 @@ def test_landing_volume_and_notifications_declared():
     assert "notifications_email" in text
 
 
-def test_workspace_host_present():
+def test_workspace_host_is_not_declared_in_bundle():
+    """No target may declare workspace.host.
+
+    Workspace URLs are deliberately not stored in this repo. The CLI rejects
+    ${var.*} interpolation on workspace.host (it configures auth), so the field
+    is omitted entirely and the host is injected as DATABRICKS_HOST by
+    scripts/deploy.sh (local, from .env) or by CI (repo variable).
+    """
     text = _read_bundle_text()
-    assert "adb-7405618019865738.18.azuredatabricks.net" in text
+    host_lines = [
+        line for line in text.splitlines()
+        if re.match(r"\s+host:", line) and "pg_host" not in line
+    ]
+    assert not host_lines, (
+        "workspace.host must not be committed; inject DATABRICKS_HOST instead. "
+        f"Found: {host_lines}"
+    )
+
+
+def test_no_workspace_host_literal_committed():
+    """Guard against a real workspace URL being reintroduced anywhere in the repo.
+
+    This is the check that keeps the scrub from silently regressing.
+    """
+    import pathlib
+    import subprocess
+
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=repo_root, capture_output=True, text=True, check=True,
+    ).stdout.split("\0")
+
+    # A real Azure Databricks workspace host: adb-<digits>.<digits>
+    pattern = re.compile(r"adb-\d{10,}\.\d+")
+    offenders = []
+    for rel in filter(None, tracked):
+        path = repo_root / rel
+        if not path.is_file():
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue  # binary or unreadable — no host literal to find
+        for match in pattern.finditer(content):
+            line_no = content[: match.start()].count("\n") + 1
+            offenders.append(f"{rel}:{line_no}: {match.group()}")
+
+    assert not offenders, (
+        "workspace host literal(s) committed — use ${var.workspace_host} or a "
+        "placeholder instead:\n  " + "\n  ".join(offenders)
+    )

@@ -1,7 +1,7 @@
 # Environments — dev / qa / prod
 
 > **Program:** Commercial Data Platform (CDP)
-> **Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
+> **Workspace:** `https://<your-workspace>.azuredatabricks.net` (Azure Databricks)
 > **Deployment:** Databricks Asset Bundles (DAB), one bundle, three targets.
 >
 > This document explains the three-environment model, how a single codebase is
@@ -114,7 +114,7 @@ targets:
     mode: development            # [dev <user>] prefixes, paused schedules, per-user isolation
     default: true
     workspace:
-      host: https://adb-7405618019865738.18.azuredatabricks.net
+      host: https://<your-workspace>.azuredatabricks.net
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/dev
     variables:
       catalog: cdp_dev
@@ -124,7 +124,7 @@ targets:
   qa:
     mode: production
     workspace:
-      host: https://adb-7405618019865738.18.azuredatabricks.net
+      host: https://<your-workspace>.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/qa
     variables:
       catalog: cdp_qa
@@ -135,7 +135,7 @@ targets:
   prod:
     mode: production
     workspace:
-      host: https://adb-7405618019865738.18.azuredatabricks.net
+      host: https://<your-workspace>.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/prod
     variables:
       catalog: cdp_prod

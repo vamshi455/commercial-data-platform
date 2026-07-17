@@ -152,7 +152,7 @@ CI/dev SP with a PR-appropriate subject (e.g. `repo:<ORG>/<REPO>:pull_request`).
 
 | GitHub **variable** | Scope | Purpose |
 |---|---|---|
-| `DATABRICKS_HOST` | repo or environment | Workspace URL `https://adb-7405618019865738.18.azuredatabricks.net` |
+| `DATABRICKS_HOST` | repo or environment | Workspace URL `https://<your-workspace>.azuredatabricks.net` |
 | `DATABRICKS_CLIENT_ID` | **environment** (`qa`, `prod`) | SP application (client) id |
 | `DEPLOY_SERVICE_PRINCIPAL` | environment | SP application id for the `run_as` bundle var |
 
@@ -310,7 +310,7 @@ A change cannot reach the next environment until **all** pass:
 3.  Add GitHub repo/env *variables* (not secrets):
        DATABRICKS_HOST, DATABRICKS_CLIENT_ID, DEPLOY_SERVICE_PRINCIPAL
        (qa & prod in GitHub Environments; configure required reviewers on `prod`).
-4.  Local auth (one-time):  databricks auth login --host https://adb-7405618019865738.18.azuredatabricks.net
+4.  Local auth (one-time):  databricks auth login --host https://<your-workspace>.azuredatabricks.net
 5.  Validate:               databricks bundle validate -t dev
 6.  Deploy dev:             databricks bundle deploy   -t dev
 7.  Seed landing data:      run data_gen / scripts to land files in /Volumes/cdp_dev/landing/files

@@ -67,9 +67,24 @@ variables:
 include:
   - resources/*.yml
 
+# =============================================================================
+# WORKSPACE HOSTS ARE NOT STORED IN THIS REPO.
 # -----------------------------------------------------------------------------
-# Targets / environments
-# -----------------------------------------------------------------------------
+# `workspace.host` is deliberately omitted from every target below. The Databricks
+# CLI does not support ${var.*} interpolation on that field (it configures auth),
+# so the only ways to pin it are a committed literal or the DATABRICKS_HOST env
+# var — and we don't commit it.
+#
+#   Local:  use scripts/deploy.sh -t <target>. It resolves CDP_HOST_DEV /
+#           CDP_HOST_QA / CDP_HOST_PROD from a gitignored .env (see .env.example),
+#           exports DATABRICKS_HOST, and refuses to run if the target's host is unset.
+#   CI:     .github/workflows/* set DATABRICKS_HOST from the repo variable.
+#
+# ⚠️  Because the host is no longer pinned per target here, a raw
+#     `databricks bundle deploy -t prod` will deploy to whatever DATABRICKS_HOST
+#     currently points at. Prefer scripts/deploy.sh, which maps target -> host.
+# =============================================================================
+
 targets:
 
   # ---- DEV: developer iteration, synthetic refreshes, isolated per-user ----
@@ -77,7 +92,6 @@ targets:
     mode: development          # prefixes resources with [dev <user>], pauses schedules
     default: true
     workspace:
-      host: https://adb-7405618019865738.18.azuredatabricks.net
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/dev
     variables:
       catalog: cdp_dev
@@ -89,7 +103,6 @@ targets:
   qa:
     mode: production
     workspace:
-      host: https://adb-7405609146609460.0.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/qa
     variables:
       catalog: cdp_qa
@@ -108,7 +121,6 @@ targets:
   prod:
     mode: production
     workspace:
-      host: https://adb-7405607547386885.5.azuredatabricks.net
       root_path: /Workspace/.bundle/${bundle.name}/prod
     variables:
       catalog: cdp_prod

@@ -2,7 +2,7 @@
 
 > **Program:** Commercial Data Platform (CDP) — a Salesforce-like CRM + SAP-like ERP
 > feeding a medallion lakehouse.
-> **Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
+> **Workspace:** `https://<your-workspace>.azuredatabricks.net` (Azure Databricks)
 > **Governance engine:** Unity Catalog (UC).
 >
 > This document describes **how the platform is governed**: the object model, the

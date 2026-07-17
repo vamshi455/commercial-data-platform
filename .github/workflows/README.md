@@ -37,7 +37,7 @@ All workflows authenticate as a Databricks **service principal** by exchanging t
 `DATABRICKS_CLIENT_SECRET`** anywhere. Each job declares `permissions: id-token:
 write` (to mint the OIDC token) and wires these **non-secret** env vars:
 
-- `DATABRICKS_HOST` — `https://adb-7405618019865738.18.azuredatabricks.net` (GitHub **variable**)
+- `DATABRICKS_HOST` — `https://<your-workspace>.azuredatabricks.net` (GitHub **variable**)
 - `DATABRICKS_CLIENT_ID` — the service principal's application id (GitHub **variable**)
 - `DATABRICKS_AUTH_TYPE: github-oidc` — pins the CLI to the OIDC flow
 

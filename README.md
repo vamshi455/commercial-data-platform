@@ -17,7 +17,7 @@ architecture, a **Delta + selective Managed Iceberg** table strategy, and automa
 - **OIDC federation (Workload Identity Federation)** — authentication: CI assumes a
   service principal via GitHub OIDC, **no stored Databricks secrets**.
 
-> **Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
+> **Workspace:** `https://<your-workspace>.azuredatabricks.net` (Azure Databricks)
 > **Catalogs:** `cdp_dev`, `cdp_qa`, `cdp_prod`
 
 ---
@@ -99,7 +99,7 @@ commercial-data-platform/
 
 ### 2. Authenticate the CLI
 ```bash
-databricks configure        # or: databricks auth login --host https://adb-7405618019865738.18.azuredatabricks.net
+databricks configure        # or: databricks auth login --host https://<your-workspace>.azuredatabricks.net
 ```
 
 ### 3. One-time platform setup (catalogs, schemas, volumes, grants)

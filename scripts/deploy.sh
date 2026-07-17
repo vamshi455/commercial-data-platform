@@ -12,6 +12,16 @@
 #
 # Auth: the Databricks CLI reads DATABRICKS_HOST / DATABRICKS_CLIENT_ID /
 #       DATABRICKS_CLIENT_SECRET (OAuth M2M) or your configured profile.
+#
+# Workspace hosts: NOT stored in this repo. databricks.yml omits workspace.host
+# (the CLI rejects ${var.*} interpolation there because it configures auth), so
+# this script resolves the host per target from CDP_HOST_DEV / CDP_HOST_QA /
+# CDP_HOST_PROD — read from a local .env (gitignored, see .env.example) — and
+# exports it as DATABRICKS_HOST. It fails loudly if the target's host is unset.
+#
+# Using this script is what maps target -> workspace. A raw `databricks bundle
+# deploy -t prod` deploys to whatever DATABRICKS_HOST already points at, which
+# is why it is not the recommended path.
 # =============================================================================
 set -euo pipefail
 
@@ -54,11 +64,48 @@ if ! command -v databricks >/dev/null 2>&1; then
   exit 1
 fi
 
+# ---- Resolve the workspace host for this target -----------------------------
+# Load local, gitignored host config if present (does not override an already-
+# exported value, so CI can inject hosts without a .env file).
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${REPO_ROOT}/.env"
+  set +a
+fi
+
+case "${TARGET}" in
+  dev)  WORKSPACE_HOST="${CDP_HOST_DEV:-}"  ;;
+  qa)   WORKSPACE_HOST="${CDP_HOST_QA:-}"   ;;
+  prod) WORKSPACE_HOST="${CDP_HOST_PROD:-}" ;;
+esac
+
+if [[ -z "${WORKSPACE_HOST}" ]]; then
+  VARNAME="CDP_HOST_$(echo "${TARGET}" | tr '[:lower:]' '[:upper:]')"
+  cat >&2 <<EOF
+ERROR: no workspace host configured for target '${TARGET}'.
+
+  Workspace hosts are not stored in this repo. Set ${VARNAME} to the
+  ${TARGET} workspace URL, either in a local .env file or in your shell:
+
+      cp .env.example .env      # then fill in the CDP_HOST_* values
+      # or:
+      export ${VARNAME}=https://<host>.azuredatabricks.net
+
+  See .env.example and databricks.yml (var.workspace_host).
+EOF
+  exit 1
+fi
+
+# databricks.yml omits workspace.host on purpose (the CLI rejects ${var.*} there,
+# since it configures auth) — DATABRICKS_HOST is the supported injection point.
+export DATABRICKS_HOST="${WORKSPACE_HOST}"
+
 # ---- Prod safety gate -------------------------------------------------------
 if [[ "${TARGET}" == "prod" && "${ASSUME_YES}" != "true" ]]; then
   echo "============================================================"
   echo "  You are about to DEPLOY TO PRODUCTION (cdp_prod)."
-  echo "  Workspace: https://adb-7405618019865738.18.azuredatabricks.net"
+  echo "  Workspace: ${WORKSPACE_HOST}"
   echo "============================================================"
   read -r -p "Type 'deploy-prod' to continue: " CONFIRM
   if [[ "${CONFIRM}" != "deploy-prod" ]]; then

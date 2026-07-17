@@ -30,7 +30,7 @@ These systems answer different questions and rarely agree on identifiers, granul
 | Open, interoperable gold | Delta everywhere + **Managed Iceberg (UC)** for select externally-consumed gold products |
 | Reproducible delivery | Databricks Asset Bundles (DABs) for CI/CD across `cdp_dev` → `cdp_qa` → `cdp_prod` |
 
-**Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` (Azure Databricks)
+**Workspace:** `https://<your-workspace>.azuredatabricks.net` (Azure Databricks)
 **Catalogs (one per environment):** `cdp_dev`, `cdp_qa`, `cdp_prod`
 **Schemas per catalog:** `landing`, `bronze`, `silver`, `gold`, `ops`, `sandbox` (sandbox in **dev only**)
 

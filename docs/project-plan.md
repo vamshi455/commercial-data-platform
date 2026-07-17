@@ -5,7 +5,7 @@ A phased plan to build the Commercial Data Platform: a Salesforce-like **CRM** +
 governance, and AI agents. Each phase lists **goals**, **deliverables**, **acceptance
 criteria**, and the **repo files/folders** that implement it.
 
-> **Workspace:** `https://adb-7405618019865738.18.azuredatabricks.net` · **Catalogs:**
+> **Workspace:** `https://<your-workspace>.azuredatabricks.net` · **Catalogs:**
 > `cdp_dev / cdp_qa / cdp_prod` · **Schemas:** `landing, bronze, silver, gold, ops` (+
 > `sandbox` in dev).
 
