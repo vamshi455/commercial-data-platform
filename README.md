@@ -57,6 +57,12 @@ architecture, a **Delta + selective Managed Iceberg** table strategy, and automa
 
 Full detail: **[docs/architecture.md](docs/architecture.md)**.
 
+**Interactive map: [docs/knowledge-graph.html](docs/knowledge-graph.html)** — every table, job, and
+agent as a clickable graph (45 nodes, 65 edges), showing what feeds what and the file doing each
+hop. Built by reading the code, so it also marks where the wiring has **drifted** from the docs and
+which bronze tables have **no consumer**. Self-contained; open it in a browser. It carries no
+credentials and hits no network.
+
 ---
 
 ## Repository layout
@@ -129,6 +135,7 @@ Promotion to `qa` / `prod` is the **same commands with `-t qa` / `-t prod`** —
 
 | Doc | What it covers |
 |---|---|
+| [docs/knowledge-graph.html](docs/knowledge-graph.html) | **Interactive** node/edge map of the whole platform + how to harvest it live from `system.access.table_lineage` |
 | [docs/architecture.md](docs/architecture.md) | End-to-end design, medallion layers, data flow, table-format strategy |
 | [docs/source-systems.md](docs/source-systems.md) | CRM + ERP entities, behaviors, PII model, data contracts |
 | [docs/data-contracts.md](docs/data-contracts.md) | Per-entity schemas, keys, SLAs, refresh cadence |

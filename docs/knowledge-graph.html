@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Interactive knowledge graph of the Rheinhardt CDP: every table, job, and agent, what feeds what, and where the wiring has drifted." />
+<style>
+  /* minimal reset (the hosted artifact runtime supplies its own; this is for standalone use) */
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; }
+</style>
+<title>Rheinhardt CDP — Platform Knowledge Graph</title>
+
+<style>
+  :root {
+    --ground:        #F4F6F8;
+    --ground-raised: #FFFFFF;
+    --ground-sunk:   #E8ECF0;
+    --line:          #D2DAE2;
+    --line-soft:     #E3E9EE;
+    --ink:           #10161C;
+    --ink-mid:       #4A5763;
+    --ink-soft:      #7B8894;
+
+    --bronze: #A86338;
+    --silver: #6E7C8C;
+    --gold:   #A87C1B;
+    --source: #55636F;
+    --index:  #1C7F78;
+
+    --live:   #2E7D51;
+    --drift:  #B3364A;
+    --stub:   #8A94A0;
+
+    --accent: #10736D;
+    --accent-soft: #D5E8E6;
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+    --r: 3px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:        #0D1116;
+      --ground-raised: #151B22;
+      --ground-sunk:   #090C10;
+      --line:          #2A343F;
+      --line-soft:     #1E262E;
+      --ink:           #E4EAF0;
+      --ink-mid:       #9AA7B4;
+      --ink-soft:      #66727E;
+
+      --bronze: #D08A56;
+      --silver: #9AAABB;
+      --gold:   #DCAE3C;
+      --source: #8592A0;
+      --index:  #3FB5AA;
+
+      --live:   #4FBF83;
+      --drift:  #E8677E;
+      --stub:   #6B7684;
+
+      --accent: #3FB5AA;
+      --accent-soft: #113330;
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ground:        #F4F6F8;
+    --ground-raised: #FFFFFF;
+    --ground-sunk:   #E8ECF0;
+    --line:          #D2DAE2;
+    --line-soft:     #E3E9EE;
+    --ink:           #10161C;
+    --ink-mid:       #4A5763;
+    --ink-soft:      #7B8894;
+    --bronze: #A86338;
+    --silver: #6E7C8C;
+    --gold:   #A87C1B;
+    --source: #55636F;
+    --index:  #1C7F78;
+    --live:   #2E7D51;
+    --drift:  #B3364A;
+    --stub:   #8A94A0;
+    --accent: #10736D;
+    --accent-soft: #D5E8E6;
+  }
+
+  :root[data-theme="dark"] {
+    --ground:        #0D1116;
+    --ground-raised: #151B22;
+    --ground-sunk:   #090C10;
+    --line:          #2A343F;
+    --line-soft:     #1E262E;
+    --ink:           #E4EAF0;
+    --ink-mid:       #9AA7B4;
+    --ink-soft:      #66727E;
+    --bronze: #D08A56;
+    --silver: #9AAABB;
+    --gold:   #DCAE3C;
+    --source: #8592A0;
+    --index:  #3FB5AA;
+    --live:   #4FBF83;
+    --drift:  #E8677E;
+    --stub:   #6B7684;
+    --accent: #3FB5AA;
+    --accent-soft: #113330;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background: var(--ground-raised);
+    padding: 18px 22px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 18px;
+  }
+  .masthead h1 {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .masthead .sub {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-mid);
+    max-width: 62ch;
+    line-height: 1.5;
+  }
+  .masthead .rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--line);
+    min-width: 20px;
+  }
+  .stamp {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ---------- control strip ---------- */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-bottom: 1px solid var(--line);
+    background: var(--ground-sunk);
+  }
+  .ctl-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-right: 2px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--ground-raised);
+    color: var(--ink-mid);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color .12s, color .12s, background .12s;
+  }
+  .chip:hover { border-color: var(--ink-soft); color: var(--ink); }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chip[aria-pressed="false"] { opacity: .42; }
+  .chip .swatch {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--sw, var(--ink-soft));
+  }
+  .chip.flag[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .search {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--ground-raised);
+    color: var(--ink);
+    width: 190px;
+  }
+  .search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .search::placeholder { color: var(--ink-soft); }
+  .spacer { flex: 1 1 auto; }
+
+  /* ---------- stage ---------- */
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    height: calc(100vh - 132px);
+    min-height: 520px;
+  }
+  @media (max-width: 900px) {
+    .stage { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .inspector { border-left: none !important; border-top: 1px solid var(--line); max-height: none !important; }
+    .canvas-wrap { height: 68vh; }
+  }
+
+  .canvas-wrap {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 1px 1px, var(--line-soft) 1px, transparent 0) 0 0 / 22px 22px,
+      var(--ground);
+    cursor: grab;
+  }
+  .canvas-wrap.dragging { cursor: grabbing; }
+  svg#graph { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .zoom-pad {
+    position: absolute;
+    right: 12px; bottom: 12px;
+    display: flex; gap: 4px;
+    background: var(--ground-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 3px;
+  }
+  .zoom-pad button {
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 26px; height: 24px;
+    border: none; border-radius: 2px;
+    background: transparent; color: var(--ink-mid);
+    cursor: pointer;
+  }
+  .zoom-pad button:hover { background: var(--ground-sunk); color: var(--ink); }
+  .zoom-pad button:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .zoom-pad button.wide { width: auto; padding: 0 8px; }
+
+  /* ---------- svg internals ---------- */
+  .lane-band { fill: var(--ink); opacity: .022; }
+  :root[data-theme="dark"] .lane-band,
+  .lane-band.dk { opacity: .04; }
+  .lane-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    fill: var(--ink-soft);
+  }
+  .col-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    fill: var(--ink-soft);
+  }
+  .col-tick { stroke: var(--line); stroke-width: 1; }
+
+  .edge {
+    fill: none;
+    stroke: var(--ink-soft);
+    stroke-opacity: .34;
+    stroke-width: 1.2;
+    transition: stroke-opacity .12s, stroke .12s, stroke-width .12s;
+  }
+  .edge.drift {
+    stroke: var(--drift);
+    stroke-opacity: .5;
+    stroke-dasharray: 4 3;
+  }
+  .edge.hot { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2; }
+  .edge.hot.drift { stroke: var(--drift); stroke-opacity: 1; }
+  .edge.cold { stroke-opacity: .06; }
+
+  .node { cursor: pointer; }
+  .node rect.body {
+    fill: var(--ground-raised);
+    stroke: var(--line);
+    stroke-width: 1;
+    rx: 3;
+    transition: stroke .12s, fill .12s;
+  }
+  .node:hover rect.body { stroke: var(--ink-soft); }
+  .node.sel rect.body { stroke: var(--accent); stroke-width: 2; }
+  .node.cold { opacity: .18; }
+  .node.stub rect.body { stroke-dasharray: 3 2.5; }
+  .node rect.stripe { rx: 1.5; }
+  .node text.label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    fill: var(--ink);
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+  .node text.meta {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: .06em;
+    fill: var(--ink-soft);
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+  .node:focus-visible rect.body { stroke: var(--accent); stroke-width: 2; }
+  .node .dot-live { fill: var(--live); }
+  .node .dot-drift { fill: var(--drift); }
+
+  /* ---------- inspector ---------- */
+  .inspector {
+    border-left: 1px solid var(--line);
+    background: var(--ground-raised);
+    overflow-y: auto;
+    padding: 18px 18px 40px;
+  }
+  .insp-eyebrow {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  .insp-title {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0 0 10px;
+    word-break: break-word;
+    text-wrap: balance;
+  }
+  .badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+  .badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    padding: 3px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--line);
+    color: var(--ink-mid);
+  }
+  .badge.live  { color: var(--live);  border-color: var(--live);  }
+  .badge.drift { color: var(--drift); border-color: var(--drift); }
+  .badge.stub  { color: var(--stub);  border-color: var(--stub);  }
+
+  .insp-note {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-mid);
+    margin: 0 0 16px;
+    padding: 10px 11px;
+    background: var(--ground-sunk);
+    border-radius: var(--r);
+    border-left: 2px solid var(--line);
+  }
+  .insp-note.warn { border-left-color: var(--drift); }
+
+  .insp-sec {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--line-soft);
+    margin: 0 0 8px;
+  }
+  .insp-block { margin-bottom: 16px; }
+  .path {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+  .rel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  .rel li { line-height: 1.45; }
+  .rel button {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    background: none; border: none; padding: 0;
+    color: var(--accent);
+    cursor: pointer;
+    text-align: left;
+  }
+  .rel button:hover { text-decoration: underline; }
+  .rel button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .rel .via {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--ink-soft);
+    word-break: break-all;
+  }
+  .empty { font-size: 12px; color: var(--ink-soft); font-style: italic; }
+
+  /* ---------- method section ---------- */
+  .method {
+    border-top: 1px solid var(--line);
+    background: var(--ground-raised);
+    padding: 40px 22px 60px;
+  }
+  .method-inner { max-width: 68ch; margin: 0 auto; }
+  .method h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+  }
+  .method .lede {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-mid);
+    margin: 0 0 26px;
+  }
+  .step { display: flex; gap: 14px; padding: 16px 0; border-top: 1px solid var(--line-soft); }
+  .step-n {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-soft);
+    padding-top: 2px;
+    min-width: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  .step h3 {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    margin: 0 0 5px;
+  }
+  .step p { margin: 0 0 8px; font-size: 13px; line-height: 1.6; color: var(--ink-mid); }
+  .step p:last-child { margin-bottom: 0; }
+  .step code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--ground-sunk);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--ink);
+  }
+  pre.snippet {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    background: var(--ground-sunk);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r);
+    padding: 11px 12px;
+    overflow-x: auto;
+    margin: 8px 0 0;
+    color: var(--ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+</head>
+<body>
+<header class="masthead">
+  <h1>Rheinhardt&nbsp;CDP</h1>
+  <p class="sub">Every table, job, and agent in the platform, and what actually feeds what — read from the code, not the docs.</p>
+  <span class="rule"></span>
+  <span class="stamp" id="stamp">— nodes · — edges</span>
+</header>
+
+<div class="controls">
+  <span class="ctl-label">Layer</span>
+  <button class="chip" data-kind="lane" data-val="core"      aria-pressed="true"><span class="swatch" style="--sw:var(--silver)"></span>Core medallion</button>
+  <button class="chip" data-kind="lane" data-val="contracts" aria-pressed="true"><span class="swatch" style="--sw:var(--index)"></span>Contracts / RAG</button>
+  <button class="chip" data-kind="lane" data-val="ops"       aria-pressed="true"><span class="swatch" style="--sw:var(--gold)"></span>Ops &amp; activation</button>
+
+  <span class="ctl-label" style="margin-left:10px">Show</span>
+  <button class="chip flag" data-kind="flag" data-val="drift"    aria-pressed="true">Drift</button>
+  <button class="chip flag" data-kind="flag" data-val="dangling" aria-pressed="true">Dangling</button>
+
+  <span class="spacer"></span>
+  <input class="search" id="search" type="search" placeholder="find a node…" aria-label="Find a node" />
+  <button class="chip" id="theme-btn" aria-pressed="false">Theme</button>
+</div>
+
+<div class="stage">
+  <div class="canvas-wrap" id="canvas-wrap">
+    <svg id="graph" role="img" aria-label="Platform data flow graph"></svg>
+    <div class="zoom-pad">
+      <button id="zoom-out" aria-label="Zoom out">−</button>
+      <button id="zoom-in"  aria-label="Zoom in">+</button>
+      <button id="zoom-fit" class="wide">fit</button>
+    </div>
+  </div>
+
+  <aside class="inspector" id="inspector">
+    <div class="insp-eyebrow">Inspector</div>
+    <p class="empty">Select a node to trace what feeds it and what it feeds.</p>
+  </aside>
+</div>
+
+<section class="method">
+  <div class="method-inner">
+    <h2>Turning this into a real knowledge graph</h2>
+    <p class="lede">
+      The map above is hand-built from the repo — accurate today, stale the moment someone merges.
+      Databricks already emits the graph as data; the work is reading it, not drawing it.
+      Four steps, cheapest first.
+    </p>
+
+    <div class="step">
+      <span class="step-n">01</span>
+      <div>
+        <h3>Harvest the edges you already own</h3>
+        <p>
+          <code>system.access.table_lineage</code> records every read/write Databricks observes, with the
+          notebook or job that did it. That is a producer→consumer edge list for free — no instrumentation,
+          no parsing. <code>column_lineage</code> gives the same at column grain.
+          <code>notebooks/lineage/impact_analysis.sql</code> already walks it recursively; it just isn't
+          persisted anywhere.
+        </p>
+        <pre class="snippet">SELECT source_table_full_name  AS src,
+       target_table_full_name  AS dst,
+       entity_type, entity_id,          -- the job/notebook = the edge label
+       max(event_time)         AS last_seen
+FROM system.access.table_lineage
+WHERE source_table_catalog = 'cdp_dev'
+GROUP BY ALL</pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n">02</span>
+      <div>
+        <h3>Add the edges lineage can't see</h3>
+        <p>
+          Runtime lineage only knows what ran. It misses the vector index → agent hop, the LLM calls, and
+          anything gated behind a broken job. Those come from static sources: <code>resources/*.yml</code>
+          for job→file and task→task, the DLT event log for flow-level dependencies, and the agent
+          <code>resources</code> declared at <code>mlflow.log_model</code> time — which is exactly the
+          index-and-endpoint list the graph above draws.
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n">03</span>
+      <div>
+        <h3>Land it as two tables, not a graph database</h3>
+        <p>
+          <code>ops.kg_node</code> and <code>ops.kg_edge</code> in Unity Catalog. Resist Neo4j here: the graph
+          is a few hundred nodes, the queries are reachability over a shallow DAG, and a recursive CTE
+          handles that fine. Keeping it in UC means it inherits governance, time travel, and the same
+          SQL surface as everything else — and any agent can already query it.
+        </p>
+        <p>
+          Node key = the full three-part name. Edge = <code>(src, dst, via_file, operation, last_seen)</code>.
+          Refresh nightly off step 01, upsert step 02 on deploy.
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n">04</span>
+      <div>
+        <h3>Make drift a query, not a discovery</h3>
+        <p>
+          This is the payoff, and this repo makes the case on its own. Every red edge above is a name that
+          exists in one file and nowhere in the catalog — <code>gold.revenue_pipeline</code> vs the deployed
+          <code>gold.gold_revenue_pipeline</code>. With the graph as a table, that whole class of bug becomes
+          an anti-join against <code>information_schema.tables</code> that runs in CI.
+        </p>
+        <p>
+          Same shape finds the dangling nodes: bronze tables with no outbound edge are ingest you're paying
+          for and nobody reads. Both checks are a dozen lines once the edges are in a table.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  "use strict";
+
+  // ── layers (x) ───────────────────────────────────────────────
+  const COLS = [
+    { id: 0, name: "Source" },
+    { id: 1, name: "Landing" },
+    { id: 2, name: "Bronze" },
+    { id: 3, name: "Silver" },
+    { id: 4, name: "Gold" },
+    { id: 5, name: "Index / Queue" },
+    { id: 6, name: "Agents & Apps" },
+  ];
+
+  const LANES = [
+    { id: "core",      name: "Core medallion" },
+    { id: "contracts", name: "Contracts / RAG" },
+    { id: "ops",       name: "Ops & activation" },
+  ];
+
+  // ── nodes ────────────────────────────────────────────────────
+  // status: ok | live | stub | drift | dangling
+  const N = [
+    // ---------- sources
+    { id:"pg_crm", label:"Postgres CRM", col:0, lane:"core", type:"Source system", tint:"source",
+      file:"data_gen/postgres/load_crm.py",
+      note:"Local Postgres reached over an ngrok tunnel, pulled on demand — not on the daily schedule. The tunnel host is injected at deploy time by scripts/pull_crm_from_pg.sh." },
+    { id:"erp_csv", label:"ERP generator", col:0, lane:"core", type:"Source system", tint:"source",
+      file:"data_gen/erp_generator.py", note:"SAP-like CSV extracts written to the landing volume." },
+    { id:"ref_csv", label:"Reference data", col:0, lane:"core", type:"Source system", tint:"source",
+      file:"data_gen/reference_data_generator.py", note:"Fiscal calendar, product hierarchy, currency, country codes — snapshot CSVs." },
+    { id:"pdf_gen", label:"Contract PDFs", col:0, lane:"contracts", type:"Source system", tint:"source",
+      file:"data_gen/contract_generator.py", note:"Synthetic Rheinhardt Industrial contracts — the RAG corpus." },
+
+    // ---------- landing
+    { id:"vol_landing", label:"landing.files", col:1, lane:"core", type:"UC Volume", tint:"source",
+      file:"notebooks/setup/00_create_catalogs_schemas.sql",
+      note:"One volume per catalog. scripts/generate_and_land.sh copies generator output here; prod is blocked unless --force." },
+    { id:"crosswalk", label:"crm_erp_crosswalk", col:1, lane:"core", type:"JSON file", tint:"source",
+      file:"data_gen/common.py",
+      note:"The identity-resolution key between CRM accounts and ERP customers. Small file, load-bearing — silver_customer's join depends on it." },
+    { id:"vol_contracts", label:"raw_contract_files", col:1, lane:"contracts", type:"UC Volume", tint:"source",
+      file:"ddl/contract_vector_search.sql",
+      note:"File-arrival trigger watches this path — dropping a PDF here starts the whole RAG job." },
+
+    // ---------- bronze
+    { id:"bronze_crm", label:"bronze_crm_* (11)", col:2, lane:"core", type:"Delta tables", tint:"bronze",
+      file:"src/pipelines/ingestion/crm_postgres_jdbc.py",
+      note:"accounts, contacts, leads, opportunities, opportunity_line_items, quotes, contracts, activities, cases, users, territories. JDBC batch read into DLT." },
+    { id:"bronze_erp", label:"bronze_erp_* (13)", col:2, lane:"core", type:"Delta tables", tint:"bronze",
+      file:"src/pipelines/ingestion/erp_autoloader.py",
+      note:"Auto Loader over CSV with schema evolution and a rescued-data column. 13 entities land; only 5 are read downstream." },
+    { id:"bronze_ref", label:"bronze_ref_* (4)", col:2, lane:"core", type:"Delta tables", tint:"bronze",
+      file:"src/pipelines/ingestion/reference_autoloader.py",
+      note:"Snapshot semantics — allowOverwrites=true, unlike ERP. Only product_hierarchy is consumed." },
+    { id:"bronze_dangling", label:"unread bronze (17)", col:2, lane:"core", type:"Delta tables", tint:"bronze", status:"dangling",
+      file:"src/pipelines/_common.py",
+      note:"Ingested every run, read by nothing: vendors, purchase_orders, gl_entries, cost_centers, profit_centers, billing_documents, sales_order_items, leads, quotes, contacts, users, opportunity_line_items, both currency_rates copies, fiscal_calendar, country_codes. Compute you pay for with no consumer — the clearest thing a live graph would catch." },
+    { id:"bronze_docs", label:"bronze_raw_contract_docs", col:2, lane:"contracts", type:"Delta table", tint:"bronze",
+      file:"src/contract_vector_search/01_bronze_ingest.py",
+      note:"Auto Loader in binaryFile mode, trigger(availableNow) so it drains and stops. Checkpoint keys on file path — the root cause of the E3 in-place-edit gap." },
+
+    // ---------- silver
+    { id:"silver_customer", label:"silver_customer", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/customer_master.py",
+      note:"The hub of the whole model. Resolves CRM accounts against ERP customers via the crosswalk and issues customer_sk — seven downstream tables join on it." },
+    { id:"silver_contract", label:"silver_contract", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/contract_order_conformance.py",
+      note:"Union of CRM contracts and Closed-Won opportunities." },
+    { id:"silver_sales_order", label:"silver_sales_order", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/contract_order_conformance.py" },
+    { id:"silver_invoice", label:"silver_invoice", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/invoice_payment_recon.py",
+      note:"Joins payments back onto invoices to derive open / partial / late state. Feeds the collections mart." },
+    { id:"silver_payment", label:"silver_payment", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/invoice_payment_recon.py" },
+    { id:"silver_activity", label:"silver_activity", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/activity_case_enrichment.py" },
+    { id:"silver_case", label:"silver_case", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/activity_case_enrichment.py" },
+    { id:"silver_product", label:"silver_product", col:3, lane:"core", type:"DLT table · SCD2", tint:"silver",
+      file:"src/pipelines/silver/product_territory_standardization.py",
+      note:"The only streaming path in the transformation pipeline — create_streaming_table + apply_changes, SCD type 2 sequenced on _seq." },
+    { id:"silver_territory", label:"silver_territory", col:3, lane:"core", type:"DLT table", tint:"silver",
+      file:"src/pipelines/silver/product_territory_standardization.py" },
+    { id:"silver_parsed", label:"silver_parsed_contracts", col:3, lane:"contracts", type:"Delta table", tint:"silver",
+      file:"src/contract_vector_search/02_silver_parse_chunk.py",
+      note:"ai_parse_document → element extraction → PII masking → contract-aware chunking at 1000 tokens / 150 overlap. Idempotent via a left-anti join on source_file — which is also what blocks re-processing an edited file." },
+    { id:"silver_failures", label:"silver_parse_failures", col:3, lane:"contracts", type:"Dead-letter", tint:"silver",
+      file:"ddl/contract_vector_search.sql",
+      note:"The one lifecycle gate that works as designed (E7). Parse failures land here instead of vanishing." },
+
+    // ---------- gold
+    { id:"gold_customer_360", label:"gold_customer_360", col:4, lane:"core", type:"DLT table", tint:"gold",
+      file:"src/pipelines/gold/customer_360.py",
+      note:"Fans in five silver tables on customer_sk." },
+    { id:"gold_revenue_pipeline", label:"gold_revenue_pipeline", col:4, lane:"core", type:"DLT table", tint:"gold",
+      file:"src/pipelines/gold/revenue_pipeline.py" },
+    { id:"gold_bookings", label:"gold_bookings_vs_billings", col:4, lane:"core", type:"DLT table", tint:"gold",
+      file:"src/pipelines/gold/revenue_pipeline.py", note:"Gold reading gold — derived from gold_revenue_pipeline, not from silver." },
+    { id:"gold_collections_risk", label:"gold_collections_risk", col:4, lane:"core", type:"DLT table", tint:"gold", status:"dangling",
+      file:"src/pipelines/gold/collections_risk.py",
+      note:"The real AR-aging mart, built from silver_invoice at customer_sk grain. Nothing reads it. The collections agent reads a synthetic seed table with a similar name instead — see gold.collections_risk (seed)." },
+    { id:"gold_support_perf", label:"gold_support_performance", col:4, lane:"core", type:"DLT table", tint:"gold",
+      file:"src/pipelines/gold/account_health_support.py" },
+    { id:"gold_account_health", label:"gold_account_health", col:4, lane:"core", type:"DLT table", tint:"gold",
+      file:"src/pipelines/gold/account_health_support.py", note:"Additive score over support, collections, and activity signals." },
+    { id:"gold_renewal_risk", label:"gold_renewal_risk", col:4, lane:"core", type:"DLT table", tint:"gold",
+      file:"src/pipelines/gold/account_health_support.py" },
+    { id:"gold_chunks", label:"gold_contract_chunks", col:4, lane:"contracts", type:"Delta · PK · CDF", tint:"gold",
+      file:"src/contract_vector_search/03_gold_merge.py",
+      note:"MERGE on chunk_id = sha2(source_file:chunk_seq). Change Data Feed is on because the Delta Sync index requires it. The MERGE has no delete branch — the E5 gap: chunks of a removed PDF stay is_current=true forever." },
+    { id:"seed_collections", label:"gold.collections_risk (seed)", col:4, lane:"ops", type:"Delta table", tint:"gold", status:"drift",
+      file:"src/agentic_actions/seed_collections_risk.py",
+      note:"An 8-row synthetic table written with mode('overwrite'), at account_id grain. This — not the DLT mart — is what the live collections agent reads. Swapping to the real mart is not a drop-in: different name, different grain, different columns, and two other files already assume this shape." },
+
+    // ---------- index / queue
+    { id:"vs_index", label:"contract_chunks_index", col:5, lane:"contracts", type:"Vector index", tint:"index",
+      file:"src/contract_vector_search/04_index_sync.py",
+      note:"Delta Sync, TRIGGERED, embeddings from databricks-gte-large-en on the cdp_contracts_vs endpoint. Note the collision: check_idle_compute.sh deletes that endpoint unconditionally every evening, and three jobs declare it as a prerequisite." },
+    { id:"eval_dataset", label:"contracts.eval_dataset", col:5, lane:"contracts", type:"Delta table", tint:"index",
+      file:"src/evals/eval_dataset_seed.py",
+      note:"10-row golden set: 6 content, 4 safety and edge. Refs resolve to stable (file, seq) pairs at seed time rather than hardcoded chunk hashes." },
+    { id:"action_queue", label:"ops.action_queue", col:5, lane:"ops", type:"Delta table", tint:"index",
+      file:"ddl/agentic_actions.sql",
+      note:"The human-in-the-loop gate. Agents propose here with status='pending'; nothing acts without approval." },
+
+    // ---------- agents & apps
+    { id:"agent_contract", label:"contract_intelligence", col:6, lane:"contracts", type:"Agent · served", tint:"index", status:"live",
+      file:"agents/contract_intelligence/model.py",
+      note:"The only agent with a serving endpoint. Mosaic AI Agent Framework, ChatAgent, model-from-code, scale_to_zero. HYBRID retrieval at k=5 filtered to is_current=true, answering with databricks-claude-sonnet-5. Read-only. Its k=5 was sized for a 1-chunk-per-doc corpus — worth re-tuning before contracts get longer." },
+    { id:"agent_collections", label:"collections", col:6, lane:"ops", type:"Agent · job", tint:"gold", status:"live",
+      file:"agents/collections/agent.py",
+      note:"The platform's first monitor→act loop. Rules flag at-risk accounts (30d overdue, $5k AR, High/Medium tier), the LLM diagnoses and drafts, a human approves. No endpoint — it runs as a batch job." },
+    { id:"agent_revenue", label:"revenue_insights", col:6, lane:"core", type:"Agent · stub", tint:"silver", status:"stub",
+      file:"agents/revenue_insights/agent.py",
+      note:"Prompt and typed tool catalog only. run_sql() raises NotImplementedError — it cannot execute anything." },
+    { id:"agent_health", label:"customer_health", col:6, lane:"core", type:"Agent · stub", tint:"silver", status:"stub",
+      file:"agents/customer_health/agent.py", note:"Stub. run_sql() raises NotImplementedError." },
+    { id:"agent_finance", label:"finance_reconciliation", col:6, lane:"core", type:"Agent · stub", tint:"silver", status:"stub",
+      file:"agents/finance_reconciliation/agent.py",
+      note:"Stub. Also reads silver.invoice / silver.payment — names that don't exist; the deployed tables are silver.silver_invoice / silver.silver_payment." },
+    { id:"agent_steward", label:"data_steward", col:6, lane:"ops", type:"Agent · stub", tint:"silver", status:"stub",
+      file:"agents/data_steward/agent.py", note:"Stub. Metadata-only by design — reads system.access.table_lineage, which is the same source a live knowledge graph would harvest." },
+    { id:"agent_ops", label:"platform_ops", col:6, lane:"ops", type:"Agent · stub", tint:"silver", status:"stub",
+      file:"agents/platform_ops/agent.py", note:"Stub. Reads DLT event logs for job and pipeline health." },
+    { id:"dashboard", label:"exec_summary", col:6, lane:"core", type:"Dashboard", tint:"gold",
+      file:"notebooks/analytics/exec_summary.sql",
+      note:"Reads five gold marts by their un-prefixed names — the same drift that affects the stub agents." },
+    { id:"action_feedback", label:"ops.action_feedback", col:6, lane:"ops", type:"Delta table", tint:"gold",
+      file:"notebooks/agentic_actions/review_queue.sql",
+      note:"Captures the human verdict on each proposed action. This is the training signal for agent learning — currently written, not yet read." },
+    { id:"eval_results", label:"ops.eval_results", col:6, lane:"contracts", type:"Delta table", tint:"index",
+      file:"src/evals/run_agent_eval.py",
+      note:"Hard gates raise SystemExit on any PII leak or obeyed injection. Those gates are real. The retrieval metrics next to them are not yet meaningful — one chunk per contract makes recall@5 = 1.0 by construction. No token or cost logging exists here." },
+  ];
+
+  // ── edges ────────────────────────────────────────────────────
+  const E = [
+    ["pg_crm","bronze_crm","src/pipelines/ingestion/crm_postgres_jdbc.py","JDBC batch read"],
+    ["erp_csv","vol_landing","scripts/generate_and_land.sh","fs cp"],
+    ["ref_csv","vol_landing","scripts/generate_and_land.sh","fs cp"],
+    ["erp_csv","crosswalk","data_gen/common.py","emit crosswalk"],
+    ["pdf_gen","vol_contracts","scripts/generate_and_land.sh","fs cp"],
+    ["vol_landing","bronze_erp","src/pipelines/ingestion/erp_autoloader.py","Auto Loader CSV"],
+    ["vol_landing","bronze_ref","src/pipelines/ingestion/reference_autoloader.py","Auto Loader CSV"],
+    ["vol_landing","bronze_dangling","src/pipelines/ingestion/erp_autoloader.py","Auto Loader CSV"],
+    ["vol_contracts","bronze_docs","src/contract_vector_search/01_bronze_ingest.py","Auto Loader binaryFile"],
+
+    ["bronze_crm","silver_customer","src/pipelines/silver/customer_master.py","dedup + normalize"],
+    ["bronze_erp","silver_customer","src/pipelines/silver/customer_master.py","dedup + normalize"],
+    ["crosswalk","silver_customer","src/pipelines/silver/customer_master.py","identity resolution"],
+    ["bronze_crm","silver_contract","src/pipelines/silver/contract_order_conformance.py","join + union"],
+    ["silver_customer","silver_contract","src/pipelines/silver/contract_order_conformance.py","join on account_id"],
+    ["bronze_erp","silver_sales_order","src/pipelines/silver/contract_order_conformance.py","join"],
+    ["silver_customer","silver_sales_order","src/pipelines/silver/contract_order_conformance.py","join"],
+    ["bronze_erp","silver_payment","src/pipelines/silver/invoice_payment_recon.py","join"],
+    ["silver_customer","silver_payment","src/pipelines/silver/invoice_payment_recon.py","join"],
+    ["bronze_erp","silver_invoice","src/pipelines/silver/invoice_payment_recon.py","join"],
+    ["silver_customer","silver_invoice","src/pipelines/silver/invoice_payment_recon.py","join"],
+    ["silver_payment","silver_invoice","src/pipelines/silver/invoice_payment_recon.py","payment aggregation"],
+    ["bronze_crm","silver_activity","src/pipelines/silver/activity_case_enrichment.py","join"],
+    ["silver_customer","silver_activity","src/pipelines/silver/activity_case_enrichment.py","join"],
+    ["bronze_crm","silver_case","src/pipelines/silver/activity_case_enrichment.py","join"],
+    ["silver_customer","silver_case","src/pipelines/silver/activity_case_enrichment.py","join"],
+    ["bronze_erp","silver_product","src/pipelines/silver/product_territory_standardization.py","readStream + apply_changes"],
+    ["bronze_ref","silver_product","src/pipelines/silver/product_territory_standardization.py","stream-static join"],
+    ["bronze_crm","silver_territory","src/pipelines/silver/product_territory_standardization.py","read"],
+
+    ["bronze_docs","silver_parsed","src/contract_vector_search/02_silver_parse_chunk.py","ai_parse_document → chunk"],
+    ["bronze_docs","silver_failures","src/contract_vector_search/02_silver_parse_chunk.py","dead-letter"],
+
+    ["silver_customer","gold_customer_360","src/pipelines/gold/customer_360.py","aggregate + join"],
+    ["silver_contract","gold_customer_360","src/pipelines/gold/customer_360.py","aggregate"],
+    ["silver_invoice","gold_customer_360","src/pipelines/gold/customer_360.py","aggregate"],
+    ["silver_case","gold_customer_360","src/pipelines/gold/customer_360.py","aggregate"],
+    ["silver_activity","gold_customer_360","src/pipelines/gold/customer_360.py","aggregate"],
+    ["silver_contract","gold_revenue_pipeline","src/pipelines/gold/revenue_pipeline.py","monthly aggregate"],
+    ["silver_sales_order","gold_revenue_pipeline","src/pipelines/gold/revenue_pipeline.py","monthly aggregate"],
+    ["silver_invoice","gold_revenue_pipeline","src/pipelines/gold/revenue_pipeline.py","monthly aggregate"],
+    ["gold_revenue_pipeline","gold_bookings","src/pipelines/gold/revenue_pipeline.py","gap calc"],
+    ["silver_invoice","gold_collections_risk","src/pipelines/gold/collections_risk.py","AR aging buckets"],
+    ["silver_customer","gold_collections_risk","src/pipelines/gold/collections_risk.py","join"],
+    ["silver_case","gold_support_perf","src/pipelines/gold/account_health_support.py","aggregate"],
+    ["silver_customer","gold_account_health","src/pipelines/gold/account_health_support.py","join"],
+    ["gold_support_perf","gold_account_health","src/pipelines/gold/account_health_support.py","join"],
+    ["gold_collections_risk","gold_account_health","src/pipelines/gold/account_health_support.py","join"],
+    ["silver_activity","gold_account_health","src/pipelines/gold/account_health_support.py","join"],
+    ["silver_contract","gold_renewal_risk","src/pipelines/gold/account_health_support.py","join + expiry filter"],
+    ["gold_account_health","gold_renewal_risk","src/pipelines/gold/account_health_support.py","join"],
+
+    ["silver_parsed","gold_chunks","src/contract_vector_search/03_gold_merge.py","MERGE on chunk_id"],
+    ["gold_chunks","vs_index","src/contract_vector_search/04_index_sync.py","Delta Sync + embed"],
+    ["gold_chunks","eval_dataset","src/evals/eval_dataset_seed.py","seed golden set"],
+    ["vs_index","agent_contract","src/contract_vector_search/retriever.py","HYBRID search k=5"],
+    ["eval_dataset","eval_results","src/evals/run_agent_eval.py","evaluate"],
+    ["agent_contract","eval_results","src/evals/run_agent_eval.py","score + hard gates"],
+
+    ["seed_collections","agent_collections","src/agentic_actions/run_collections_agent.py","read risk rows"],
+    ["agent_collections","action_queue","src/agentic_actions/run_collections_agent.py","append pending"],
+    ["action_queue","action_feedback","notebooks/agentic_actions/review_queue.sql","human approve"],
+
+    // drift edges — consumer reads a name that isn't the deployed name
+    ["gold_revenue_pipeline","dashboard","notebooks/analytics/exec_summary.sql","reads gold.revenue_pipeline",1],
+    ["gold_account_health","dashboard","notebooks/analytics/exec_summary.sql","reads gold.account_health",1],
+    ["gold_renewal_risk","dashboard","notebooks/analytics/exec_summary.sql","reads gold.renewal_risk",1],
+    ["gold_revenue_pipeline","agent_revenue","agents/revenue_insights/agent.py","reads gold.revenue_pipeline",1],
+    ["gold_bookings","agent_revenue","agents/revenue_insights/agent.py","reads gold.bookings_vs_billings",1],
+    ["gold_account_health","agent_health","agents/customer_health/agent.py","reads gold.account_health",1],
+    ["gold_renewal_risk","agent_health","agents/customer_health/agent.py","reads gold.renewal_risk",1],
+    ["silver_invoice","agent_finance","agents/finance_reconciliation/agent.py","reads silver.invoice",1],
+    ["silver_payment","agent_finance","agents/finance_reconciliation/agent.py","reads silver.payment",1],
+  ];
+
+  // ── layout ───────────────────────────────────────────────────
+  const NW = 168, NH = 34, COLW = 236, ROWH = 46, LANE_PAD = 34, TOP = 44, LEFT = 26;
+
+  const byId = new Map(N.map(n => [n.id, n]));
+  E.forEach(e => { e[4] = e[4] ? "drift" : "normal"; });
+
+  const inc = new Map(), out = new Map();
+  N.forEach(n => { inc.set(n.id, []); out.set(n.id, []); });
+  E.forEach(e => { out.get(e[0]).push(e); inc.get(e[1]).push(e); });
+
+  // stack nodes within each lane × column, then offset lanes vertically
+  let y = TOP;
+  const laneBounds = [];
+  LANES.forEach(lane => {
+    const members = N.filter(n => n.lane === lane.id);
+    let rows = 0;
+    COLS.forEach(c => {
+      const inCol = members.filter(n => n.col === c.id);
+      inCol.forEach((n, i) => { n._x = LEFT + c.id * COLW; n._y = y + i * ROWH; });
+      rows = Math.max(rows, inCol.length);
+    });
+    const h = Math.max(rows, 1) * ROWH;
+    laneBounds.push({ lane, top: y - 12, height: h + 4 });
+    y += h + LANE_PAD;
+  });
+
+  const W = LEFT + COLS.length * COLW + 40;
+  const H = y + 10;
+
+  // ── render ───────────────────────────────────────────────────
+  const svg = document.getElementById("graph");
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (t, a = {}) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+  const root = el("g");
+  svg.appendChild(root);
+
+  const gLane = el("g"), gEdge = el("g"), gNode = el("g");
+  root.appendChild(gLane); root.appendChild(gEdge); root.appendChild(gNode);
+
+  // lane bands + labels
+  laneBounds.forEach(b => {
+    gLane.appendChild(el("rect", { x: 8, y: b.top, width: W - 16, height: b.height, rx: 4, class: "lane-band" }));
+    const t = el("text", { x: 14, y: b.top - 5, class: "lane-label" });
+    t.textContent = b.lane.name;
+    gLane.appendChild(t);
+  });
+
+  // column headers
+  COLS.forEach(c => {
+    const x = LEFT + c.id * COLW;
+    const t = el("text", { x: x, y: 18, class: "col-label" });
+    t.textContent = c.name;
+    gLane.appendChild(t);
+    gLane.appendChild(el("line", { x1: x, y1: 26, x2: x + NW, y2: 26, class: "col-tick" }));
+  });
+
+  // edges
+  const edgeEls = [];
+  E.forEach(e => {
+    const a = byId.get(e[0]), b = byId.get(e[1]);
+    if (!a || !b) return;
+    const x1 = a._x + NW, y1 = a._y + NH / 2;
+    const x2 = b._x,      y2 = b._y + NH / 2;
+    const dx = Math.max(30, (x2 - x1) * 0.5);
+    const p = el("path", {
+      d: `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`,
+      class: "edge" + (e[4] === "drift" ? " drift" : ""),
+    });
+    p._e = e;
+    gEdge.appendChild(p);
+    edgeEls.push(p);
+  });
+
+  // nodes
+  const nodeEls = new Map();
+  N.forEach(n => {
+    const g = el("g", { class: "node" + (n.status === "stub" ? " stub" : ""), tabindex: "0", role: "button" });
+    g.setAttribute("transform", `translate(${n._x},${n._y})`);
+    g.setAttribute("aria-label", n.label);
+
+    g.appendChild(el("rect", { class: "body", x: 0, y: 0, width: NW, height: NH }));
+    g.appendChild(el("rect", { class: "stripe", x: 0, y: 0, width: 3, height: NH, fill: `var(--${n.tint})` }));
+
+    const lab = el("text", { class: "label", x: 11, y: NH / 2 - 4 });
+    lab.textContent = n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label;
+    g.appendChild(lab);
+
+    const meta = el("text", { class: "meta", x: 11, y: NH / 2 + 8 });
+    meta.textContent = (n.type || "").toUpperCase();
+    g.appendChild(meta);
+
+    if (n.status === "live")  g.appendChild(el("circle", { class: "dot-live",  cx: NW - 10, cy: 10, r: 3 }));
+    if (n.status === "drift") g.appendChild(el("circle", { class: "dot-drift", cx: NW - 10, cy: 10, r: 3 }));
+    if (n.status === "dangling") {
+      const q = el("text", { class: "meta", x: NW - 16, y: 11, "text-anchor": "end" });
+      q.textContent = "⊘"; q.style.fill = "var(--ink-soft)";
+      g.appendChild(q);
+    }
+
+    g.addEventListener("click", () => select(n.id));
+    g.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+    g.addEventListener("mouseenter", () => hot(n.id));
+    g.addEventListener("mouseleave", () => hot(sel));
+
+    gNode.appendChild(g);
+    nodeEls.set(n.id, g);
+  });
+
+  document.getElementById("stamp").textContent = `${N.length} nodes · ${E.length} edges`;
+
+  // ── highlight ────────────────────────────────────────────────
+  let sel = null;
+
+  function hot(id) {
+    if (!id) {
+      edgeEls.forEach(p => p.classList.remove("hot", "cold"));
+      nodeEls.forEach(g => g.classList.remove("cold"));
+      return;
+    }
+    const near = new Set([id]);
+    E.forEach(e => { if (e[0] === id) near.add(e[1]); if (e[1] === id) near.add(e[0]); });
+    edgeEls.forEach(p => {
+      const on = p._e[0] === id || p._e[1] === id;
+      p.classList.toggle("hot", on);
+      p.classList.toggle("cold", !on);
+    });
+    nodeEls.forEach((g, nid) => g.classList.toggle("cold", !near.has(nid)));
+  }
+
+  function select(id) {
+    sel = id;
+    nodeEls.forEach((g, nid) => g.classList.toggle("sel", nid === id));
+    hot(id);
+    paint(byId.get(id));
+  }
+
+  // ── inspector ────────────────────────────────────────────────
+  const insp = document.getElementById("inspector");
+
+  function relList(edges, dir) {
+    if (!edges.length) return `<p class="empty">${dir === "up" ? "Nothing feeds this — it's an entry point." : "Nothing reads this."}</p>`;
+    return `<ul class="rel">` + edges.map(e => {
+      const other = dir === "up" ? e[0] : e[1];
+      const o = byId.get(other);
+      return `<li><button data-goto="${other}">${dir === "up" ? "↑" : "↓"} ${o ? o.label : other}</button>
+        <span class="via">${e[3]} · ${e[2]}</span></li>`;
+    }).join("") + `</ul>`;
+  }
+
+  function paint(n) {
+    if (!n) return;
+    const badges = [];
+    badges.push(`<span class="badge">${COLS[n.col].name}</span>`);
+    if (n.status === "live")     badges.push(`<span class="badge live">Live</span>`);
+    if (n.status === "stub")     badges.push(`<span class="badge stub">Stub — cannot execute</span>`);
+    if (n.status === "drift")    badges.push(`<span class="badge drift">Name drift</span>`);
+    if (n.status === "dangling") badges.push(`<span class="badge">No consumer</span>`);
+
+    const warn = (n.status === "drift" || n.status === "dangling") ? " warn" : "";
+
+    insp.innerHTML = `
+      <div class="insp-eyebrow">${n.type || "Node"}</div>
+      <h2 class="insp-title">${n.label}</h2>
+      <div class="badges">${badges.join("")}</div>
+      ${n.note ? `<p class="insp-note${warn}">${n.note}</p>` : ""}
+      <div class="insp-block">
+        <p class="insp-sec">Defined in</p>
+        <p class="path">${n.file || "—"}</p>
+      </div>
+      <div class="insp-block">
+        <p class="insp-sec">Upstream — ${inc.get(n.id).length}</p>
+        ${relList(inc.get(n.id), "up")}
+      </div>
+      <div class="insp-block">
+        <p class="insp-sec">Downstream — ${out.get(n.id).length}</p>
+        ${relList(out.get(n.id), "down")}
+      </div>`;
+    insp.querySelectorAll("[data-goto]").forEach(b =>
+      b.addEventListener("click", () => select(b.dataset.goto)));
+    insp.scrollTop = 0;
+  }
+
+  // ── filters ──────────────────────────────────────────────────
+  const laneOn = new Set(LANES.map(l => l.id));
+  const flagOn = new Set(["drift", "dangling"]);
+
+  function visible(n) {
+    if (!laneOn.has(n.lane)) return false;
+    if (n.status === "drift"    && !flagOn.has("drift"))    return false;
+    if (n.status === "dangling" && !flagOn.has("dangling")) return false;
+    return true;
+  }
+
+  function applyFilters() {
+    nodeEls.forEach((g, id) => { g.style.display = visible(byId.get(id)) ? "" : "none"; });
+    edgeEls.forEach(p => {
+      const a = byId.get(p._e[0]), b = byId.get(p._e[1]);
+      const show = visible(a) && visible(b) && (p._e[4] !== "drift" || flagOn.has("drift"));
+      p.style.display = show ? "" : "none";
+    });
+  }
+
+  document.querySelectorAll(".chip[data-kind]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const on = btn.getAttribute("aria-pressed") === "true";
+      btn.setAttribute("aria-pressed", String(!on));
+      const set = btn.dataset.kind === "lane" ? laneOn : flagOn;
+      if (on) set.delete(btn.dataset.val); else set.add(btn.dataset.val);
+      applyFilters();
+    });
+  });
+
+  // ── search ───────────────────────────────────────────────────
+  document.getElementById("search").addEventListener("input", ev => {
+    const q = ev.target.value.trim().toLowerCase();
+    if (!q) { nodeEls.forEach(g => g.classList.remove("cold")); hot(sel); return; }
+    const hits = N.filter(n => n.label.toLowerCase().includes(q) || (n.file || "").toLowerCase().includes(q));
+    const ids = new Set(hits.map(h => h.id));
+    nodeEls.forEach((g, id) => g.classList.toggle("cold", !ids.has(id)));
+    edgeEls.forEach(p => p.classList.add("cold"));
+    if (hits.length === 1) select(hits[0].id);
+  });
+
+  // ── pan / zoom ───────────────────────────────────────────────
+  let vx = 0, vy = 0, vs = 1;
+  const wrap = document.getElementById("canvas-wrap");
+
+  const apply = () => root.setAttribute("transform", `translate(${vx},${vy}) scale(${vs})`);
+
+  function fit() {
+    const r = wrap.getBoundingClientRect();
+    vs = Math.min(r.width / (W + 20), r.height / (H + 20), 1.15);
+    vx = (r.width  - W * vs) / 2;
+    vy = (r.height - H * vs) / 2;
+    apply();
+  }
+
+  wrap.addEventListener("wheel", ev => {
+    ev.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    const f = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const ns = Math.min(2.6, Math.max(0.22, vs * f));
+    vx = mx - (mx - vx) * (ns / vs);
+    vy = my - (my - vy) * (ns / vs);
+    vs = ns; apply();
+  }, { passive: false });
+
+  let dragging = false, lx = 0, ly = 0;
+  wrap.addEventListener("pointerdown", ev => {
+    if (ev.target.closest(".node") || ev.target.closest(".zoom-pad")) return;
+    dragging = true; lx = ev.clientX; ly = ev.clientY;
+    wrap.classList.add("dragging"); wrap.setPointerCapture(ev.pointerId);
+  });
+  wrap.addEventListener("pointermove", ev => {
+    if (!dragging) return;
+    vx += ev.clientX - lx; vy += ev.clientY - ly;
+    lx = ev.clientX; ly = ev.clientY; apply();
+  });
+  const stop = () => { dragging = false; wrap.classList.remove("dragging"); };
+  wrap.addEventListener("pointerup", stop);
+  wrap.addEventListener("pointercancel", stop);
+
+  const zoomBy = f => {
+    const r = wrap.getBoundingClientRect(), mx = r.width / 2, my = r.height / 2;
+    const ns = Math.min(2.6, Math.max(0.22, vs * f));
+    vx = mx - (mx - vx) * (ns / vs);
+    vy = my - (my - vy) * (ns / vs);
+    vs = ns; apply();
+  };
+  document.getElementById("zoom-in").addEventListener("click", () => zoomBy(1.2));
+  document.getElementById("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
+  document.getElementById("zoom-fit").addEventListener("click", fit);
+
+  // ── theme toggle ─────────────────────────────────────────────
+  document.getElementById("theme-btn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  });
+
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.removeAttribute("viewBox");
+  fit();
+  addEventListener("resize", fit);
+  select("silver_customer");
+})();
+</script>
+
+</body>
+</html>
