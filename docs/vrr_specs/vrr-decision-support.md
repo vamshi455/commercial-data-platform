@@ -108,6 +108,67 @@ computes the numbers and may only claim a driver the decomposition supports.
 | app shell | the §9.5 report app pattern (Streamlit / Databricks App) |
 | logged transformation ("how is it calc'd") | `vrr_agent.pattern_vrr_log` + `VRR_EXPLAIN_CALC` |
 
+## 5.1 Agent tools inventory (8 tools, all deterministic)
+Backed by 4 UC functions (`vrr_get`, `vrr_lineage`, `vrr_impact`, `vrr_trace`).
+
+| # | Tool | Purpose | Backing |
+|---|---|---|---|
+| 1 | `VRR_LIST_PATTERNS` | discovery — what patterns/periods exist | `pattern_vrr_monthly` |
+| 2 | `VRR_OVERVIEW` | portfolio — all patterns vs target, ranked by drift | `pattern_vrr_*` |
+| 3 | `VRR_GET` | a specific VRR value + target/prior/peer refs | `vrr_get` UC fn |
+| 4 | `VRR_DECOMPOSE` | exact LMDI attribution ("why did it change") | `completion_contrib` |
+| 5 | `VRR_LINEAGE` | on-the-fly root-trace tree | `completion_contrib` |
+| 6 | `VRR_LINEAGE_GRAPH` | persisted root-trace | `vrr_trace` UC fn / `lineage_edge` |
+| 7 | `VRR_IMPACT` | what-if / impact (forward reachability) | `vrr_impact` UC fn / `lineage_edge` |
+| 8 | `VRR_EXPLAIN_CALC` | retrieve the actual logged build SQL | `pattern_vrr_log` |
+
+```mermaid
+flowchart LR
+    U(["question"]) --> AG
+    subgraph AG["Agent (LLM — the ONLY non-deterministic part)"]
+      R["route (pick tool)"] --> P["parse args (pattern/date/grain)"] --> N["narrate"]
+    end
+    AG -->|tool calls| T["8 deterministic tools"]
+    T --> D[("vrr_curated · lineage_node/edge · pattern_vrr_log")]
+    AG --> G["faithfulness gate (deterministic)"]
+```
+
+## 5.2 Determinism model
+**Deterministic (same input → same output):** all 8 tools, the VRR math (`vrr_build.sql`/
+`physics.py`), the lineage-graph build, and the faithfulness gate. The numbers people act on
+never vary.
+
+**Non-deterministic (the LLM), in exactly three places:**
+1. **Tool routing** — which tools it calls, in what order.
+2. **Argument extraction / parsing** — turning `"UNITY April"` into the exact fields a tool
+   needs: `{pattern: "PUNITY", date: "2026-04-01", grain: "monthly"}` (name→id, month→date,
+   grain default). Today the LLM does this → it can misparse.
+3. **Narration** — phrasing the final answer (numbers are safe; wording varies).
+
+**How to shrink each:**
+- Routing → a deterministic **intent router** (classify → fixed tool pipeline per intent).
+- Parsing → **deterministic date parser + `resolve_pattern` against the catalog + validate**;
+  clarify if the parsed pattern/date isn't real. Don't trust the LLM's free-form arg fill.
+- Narration → **templated output** (LLM polish only) + a **number-level faithfulness gate**
+  (every figure in the answer must exist in the tool payload) + **cache** per (intent, pattern,
+  date, run_id).
+
+Principle: make the LLM do the least — ideally only NL→(validated intent+args) and light polish.
+
+## 5.3 Genie integration (a choice; not yet wired)
+Genie is NOT currently in the workflow (today = custom agent + 8 tools). Two opposite ways to
+combine — pick one:
+
+| | Option A — Genie *inside* our agent | Option B — our functions *inside* Genie (recommended) |
+|---|---|---|
+| Shape | agent keeps 8 tools + a `GENIE_QUERY` tool; routes known→tools, ad-hoc→Genie | Genie is primary; register `vrr_get/impact/trace` UC functions + `vrr_*` tables in a Genie space; thin/no custom agent |
+| Pros | one entry point, deterministic core kept | least to maintain, native NL→SQL flexibility |
+| Cons | more agent code to maintain | lose the faithfulness gate unless `vrr_decompose` is kept as a UC function |
+| Make deterministic | intent router + templates (5.2) | **Metric Views** (VRR/target/verdict) + **certified queries** + read-only guardrails |
+
+Recommendation: **Option B** for production (Genie chats over the governed tables + our UC
+functions), keeping the deterministic UC functions for the answers that must be exact.
+
 ## 6. Guardrails (non-negotiable — physical reservoir)
 - **Advisory only** — the app recommends; **field ops execute**. Never autonomous well/valve control.
 - **Multi-level human approval mandatory** (Analyst → RM → Site).
