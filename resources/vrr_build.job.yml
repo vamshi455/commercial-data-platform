@@ -1,0 +1,34 @@
+# =============================================================================
+# resources/vrr_build.job.yml
+# -----------------------------------------------------------------------------
+# One job that REFRESHES VRR end-to-end and fulfils the transformation log:
+#   08_run_and_log_vrr.py  →  runs vrr_build.sql (raw → completion_contrib →
+#   pattern_vrr_daily/_monthly), rebuilds the lineage graph (06), and logs the
+#   ACTUAL build SQL into vrr_agent.pattern_vrr_log (per asset + grain + run_id).
+# After a run: VRR is refreshed AND the agent's VRR_EXPLAIN_CALC has the latest
+# SQL to answer "how is VRR calculated".
+#   databricks bundle run job_vrr_build -t dev
+# =============================================================================
+resources:
+  jobs:
+    job_vrr_build:
+      name: "[${bundle.target}] job_vrr_build"
+      description: >-
+        Refresh VRR (raw → completion_contrib → pattern_vrr_*), rebuild the value-
+        level lineage graph, and log the build SQL to vrr_agent.pattern_vrr_log so
+        the agent can explain the methodology from source.
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: vrr
+      tasks:
+        - task_key: run_and_log_vrr
+          notebook_task:
+            notebook_path: ../src/vrr_agent/08_run_and_log_vrr.py
+            base_parameters:
+              catalog: ${var.catalog}
+              asset_name: CDP_VRR
+              source_root: ${workspace.file_path}
+      queue:
+        enabled: true
+      # schedule: add a cron here to auto-refresh (paused in dev by mode: development)

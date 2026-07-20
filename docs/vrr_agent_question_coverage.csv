@@ -1,0 +1,21 @@
+category,example_question,covered,tool_or_mechanism,notes
+Discovery,"What patterns exist? What periods are loaded?",yes,VRR_LIST_PATTERNS,Lists patterns + date coverage + latest VRR; use when no pattern named.
+Portfolio / summary,"Which patterns are over- or under-replacing? Give me a summary. Worst patterns?",yes,VRR_OVERVIEW,All patterns vs target ranked by drift (latest or a given date).
+Specific value,"What is UNITY's VRR in April 2026?",yes,VRR_GET,Stored VRR + cum VRR + target/prior/peer references.
+Comparison,"Compare UNITY vs DELTA.",yes,VRR_OVERVIEW / VRR_GET,Portfolio snapshot or two point lookups.
+Why / drivers,"Why did UNITY's VRR change from March to April? What drove it?",yes,VRR_DECOMPOSE,Exact LMDI attribution to drivers + pressure/Bg/Rs deltas + top completions.
+Trace / proof,"Trace UNITY's April VRR to its raw inputs. Prove this number.",yes,VRR_LINEAGE / VRR_LINEAGE_GRAPH,On-the-fly tree or the persisted value-level graph.
+Impact / what-if,"If April pressure changed, which VRRs move? What depends on this input?",yes,VRR_IMPACT,Forward reachability over the persisted lineage graph.
+How / methodology,"How is VRR calculated? Show the SQL or pseudo-code. What's the methodology?",yes,VRR_EXPLAIN_CALC,Retrieves the ACTUAL logged build SQL (pattern_vrr_log) and explains it; never from memory.
+Confidence,"Is this number reliable? Was PVT extrapolated?",yes,VRR_GET / VRR_LINEAGE,Surfaces any_extrapolated + pvt_method + missing_input.
+Ambiguous,"How's the VRR looking?",yes,clarify then route,Asks which pattern/period, or lists patterns first.
+Non-VRR domain,"What's the weather? Explain the contract. Show revenue pipeline.",no,out of scope (system prompt),Declined; contracts/revenue are other CDP agents.
+Unknown pattern or date,"VRR for pattern ZEBRA in 1990?",no (graceful),VRR_GET returns not-found,Answers only data that has been built (currently UNITY/DELTA, Mar-Apr 2026).
+Manual arithmetic,"Recompute VRR yourself / calculate it by hand.",no (by design),no-arithmetic guardrail,LLM never computes; numbers come only from deterministic tools.
+Actions,"Change the injection / run the build / email a report / fix the data.",no,read-only; no action tools,Agent explains and reads; it does not act (email direction was dropped).
+Forecast / prediction,"What will VRR be next month? Predict the trend.",no,no forecasting tool,Only stored/historical periods; no model for prediction.
+Platform table lineage,"What tables/columns feed VRR across the catalog?",partial,not wired,Only VALUE-level VRR lineage today; Unity Catalog table/column lineage not exposed as a tool.
+Multi-asset,"Show asset X's patterns.",partial,one asset loaded,Only asset CDP_VRR is built in dev; multi-asset works once more are loaded.
+Real-time / streaming,"What's the live VRR right now?",no,batch only,Answers the latest BUILT period; no streaming.
+Transformation history diff,"How did the calculation change between runs?",partial,run_id versioning exists,pattern_vrr_log/graph are run_id-stamped; no diff tool yet.
+Data quality / anomaly,"Find bad or suspicious data.",partial,confidence flags only,Surfaces missing_input / extrapolated PVT; no dedicated anomaly scan.

@@ -1,0 +1,33 @@
+# =============================================================================
+# resources/deploy_vrr_agent.job.yml
+# -----------------------------------------------------------------------------
+# One-off job to log + register + deploy the VRR Reasoning & Lineage agent via
+# the Mosaic AI Agent Framework (surfaces it under Models / Serving / Experiments).
+# PREREQ: cdp_dev.vrr_curated.* built (vrr_build.sql) + the UC functions
+# vrr_get / vrr_lineage registered. Served endpoint is scale-to-zero.
+#   databricks bundle run job_deploy_vrr_agent -t dev
+# =============================================================================
+resources:
+  jobs:
+    job_deploy_vrr_agent:
+      name: "[${bundle.target}] job_deploy_vrr_agent"
+      description: >-
+        Log + register + deploy the VRR agent: log agents/vrr_reasoning/model.py
+        from-code with code_paths=src/vrr_agent and resources (gen endpoint + UC
+        functions) → UC model ${var.catalog}.vrr_agent.vrr_reasoning →
+        agents.deploy (scale_to_zero). Reads vrr_curated via a SQL warehouse.
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: agents
+      tasks:
+        - task_key: deploy_vrr_agent
+          notebook_task:
+            notebook_path: ../notebooks/agents/deploy_vrr_agent.py
+            base_parameters:
+              catalog: ${var.catalog}
+              gen_model: databricks-claude-sonnet-5
+              warehouse_http_path: ${var.warehouse_http_path}
+              source_root: ${workspace.file_path}
+      queue:
+        enabled: true
