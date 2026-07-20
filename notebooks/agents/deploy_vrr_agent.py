@@ -12,7 +12,7 @@
 # databricks-sql-connector — Serving has no Spark).
 #   databricks bundle run job_deploy_vrr_agent -t dev
 # =============================================================================
-# MAGIC %pip install --quiet -U mlflow databricks-agents databricks-sql-connector databricks-sdk
+# MAGIC %pip install --quiet -U "mlflow>=3.1.3" "databricks-agents>=1.1.0" databricks-sql-connector databricks-sdk
 # MAGIC %restart_python
 
 # COMMAND ----------
@@ -50,6 +50,15 @@ print("model:", MODEL_FILE, "\ncode_paths:", VRR_PKG, "\nsrc:", SRC_ROOT, "\nUC 
 # ---- log the agent (from code) + register to Unity Catalog -------------------
 mlflow.set_registry_uri("databricks-uc")
 
+# MLflow 3 real-time tracing: agents.deploy() links the endpoint's trace store to the
+# experiment the MODEL is logged under, so set a dedicated NON-Git experiment HERE
+# (before log_model). Traces silently don't stream if the active experiment is a
+# Git-folder notebook. The @mlflow.trace spans in model.py then show live per request.
+_user = spark.sql("SELECT current_user()").collect()[0][0]                # noqa: F821
+TRACE_EXPERIMENT = f"/Users/{_user}/vrr_agent_traces"
+mlflow.set_experiment(TRACE_EXPERIMENT)
+print("real-time tracing experiment:", TRACE_EXPERIMENT)
+
 # WAREHOUSE_ID from the HTTP path (…/warehouses/<id>) — declaring the warehouse as
 # a resource scopes the endpoint's auto-provisioned token to it (so _connect works).
 WAREHOUSE_ID = HTTP_PATH.rstrip("/").split("/")[-1]
@@ -80,7 +89,7 @@ with mlflow.start_run(run_name="vrr_reasoning_deploy"):
         code_paths=[VRR_PKG],                    # ship src/vrr_agent alongside
         resources=resources,
         pip_requirements=[
-            "mlflow", "databricks-agents", "databricks-sql-connector", "databricks-sdk",
+            "mlflow>=3.1.3", "databricks-agents>=1.1.0", "databricks-sql-connector", "databricks-sdk",
         ],
         registered_model_name=UC_MODEL,
     )
