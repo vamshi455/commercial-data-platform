@@ -95,6 +95,19 @@ with mlflow.start_run(run_name="vrr_reasoning_deploy"):
     )
 print("registered:", logged.registered_model_version, "uri:", logged.model_uri)
 
+# Describe the UC registered model so it isn't blank in Catalog Explorer (the comment
+# lives on the model, not the version, so it persists across re-registrations).
+from mlflow import MlflowClient
+MlflowClient(registry_uri="databricks-uc").update_registered_model(
+    UC_MODEL,
+    description=(
+        "VRR Reasoning & Lineage agent (Mosaic AI ChatAgent). Answers natural-language "
+        "questions about oil & gas Voidage Replacement Ratio over cdp_dev.vrr_curated using "
+        "8 deterministic tools (discovery, portfolio, value, why/LMDI-decompose, lineage/trace, "
+        "impact/what-if, how-it-is-calculated). LLM narrates tool output and never computes; a "
+        "faithfulness gate verifies attributions. Design: docs/vrr_specs/vrr-decision-support.md."))
+print("model description set.")
+
 # COMMAND ----------
 # ---- deploy to Model Serving (scale-to-zero) --------------------------------
 from databricks import agents
