@@ -169,6 +169,74 @@ combine — pick one:
 Recommendation: **Option B** for production (Genie chats over the governed tables + our UC
 functions), keeping the deterministic UC functions for the answers that must be exact.
 
+## 5.4 Agentic loop — memory + monitor→act→learn (what makes it a true AI agent)
+Today the VRR agent is agentic Q&A (tool-use + reasoning + self-verification). These three
+additions make it an autonomous decision agent: it **remembers**, **acts** (with sign-off),
+and **learns**.
+
+```mermaid
+flowchart TD
+    T["⏰ job_vrr_anomaly (after job_vrr_build)"] --> DET["DETECT anomalies (deterministic rules)"]
+    DET --> MEM1["retrieve MEMORY for the pattern:<br/>entity state · past anomalies/decisions/outcomes · knowledge"]
+    MEM1 --> REC["RECOMMEND valve/injection change<br/>= physics target + precedent calibration + safety bound"]
+    REC --> Q[("action_queue (staged: analyst→RM→site)")]
+    Q --> H["👤 multi-level approval"] --> ACT["field executes"]
+    ACT --> OUT[("adjustment_history: pre/post VRR, outcome")]
+    OUT -->|update per-pattern response factor ρ| LEARN["LEARN (calibrate)"]
+    LEARN -.feeds next.-> REC
+    OUT -.episodic memory.-> MEM1
+```
+
+### A. Memory (persist context so it reasons with history) — see also `docs/specs/agent-memory.md`
+Four tiers, all Delta/UC-native:
+| Tier | Store | Used for |
+|---|---|---|
+| **Working / conversation** | `vrr_agent.session_memory(session_id, ts, role, content, pattern_context)` | continuity within/across a user's sessions |
+| **Episodic (long-term)** | `vrr_agent.adjustment_history` (anomaly → decision → outcome) | "what happened last time on this pattern" |
+| **Semantic** | `reservoir_knowledge` vector index (engineer PDFs, Slice C) | constraints, well behavior, heuristics |
+| **Entity** | `vrr_agent.pattern_memory(pattern_id, latest_state, tendencies, response_factor, recent_anomalies)` | per-pattern rolling summary + learned gain |
+
+At reason-time for pattern P, the agent retrieves `pattern_memory(P)` + recent `adjustment_history(P)`
++ semantic hits + session history → grounds every recommendation in precedent, not just the current number.
+
+### B. Monitor → Act (autonomy)
+`job_vrr_anomaly` (scheduled, runs after the refresh) detects anomalies (out-of-band VRR, sustained
+MoM drift, extrapolated-PVT/reconciliation flags), and for each **invokes the recommendation engine
+in batch** (not chat) → writes a **draft** to `action_queue` → notifies the RM. The agent now *acts*
+(proposes) on a trigger, not only when asked.
+
+### C. Recommendation engine (draft the valve adjustment) — deterministic core
+The magnitude is **computed, not guessed** (preserves the trust model):
+1. **Physics target:** to steer VRR→target, required `INJ_RES_target = target_VRR × PROD_RES`;
+   `ΔINJ_RES = INJ_RES_target − INJ_RES_current`.
+2. **To surface rate:** `Δwater_inj_surface = ΔINJ_RES / (FACTOR × Bw_inj)`, allocated across the
+   pattern's injector completions.
+3. **Precedent calibration:** apply the learned per-pattern **response factor** `ρ` (§D) —
+   `Δrecommended = ΔINJ_RES / ρ` — to correct for systematic over/under-response seen historically.
+4. **Safety bound:** clamp to `safety_limits` (max injection-rate change, injection pressure,
+   fracture gradient); flag if the needed change exceeds limits (→ escalate, don't auto-cap silently).
+5. **Narrate (LLM):** the recommendation names the wells, the Δrate, the **expected post-VRR**, the
+   **driver** (from `VRR_DECOMPOSE`), the **precedent** (from history), and **confidence** — cited,
+   never invented. Draft-only.
+
+New table: `vrr_agent.safety_limits(pattern_id, completion_id, max_inj_rate_change_pct, max_inj_pressure, ...)`.
+
+### D. Learning loop (use outcomes to shape the next recommendation)
+Concrete + deterministic (not opaque RL):
+- On execution, record `predicted_post_vrr` vs `actual_post_vrr` in `adjustment_history`.
+- Update the per-pattern **response factor** `ρ = EMA(actual ΔVRR / predicted ΔVRR)` in `pattern_memory`.
+  If a pattern consistently over-responds (`ρ>1`), future recommendations are tempered; under-responds
+  (`ρ<1`), strengthened. This is the "use outcomes to recommend the next" mechanism.
+- **Case-based precedent:** retrieve the most similar past anomalies (same driver/season/pattern) and
+  surface "last time X was done → VRR went to Y" in the draft.
+- Human decisions (approved / edited / rejected) + the MLflow monitoring scorers add quality signals.
+
+### Build order for this layer
+1. `pattern_memory` + `adjustment_history` + `safety_limits` tables.
+2. Recommendation engine (deterministic Δinjection + ρ calibration + safety bound + narrate).
+3. `job_vrr_anomaly` (monitor→detect→recommend→queue) + the staged `action_queue` (Slice B).
+4. Learning update (write outcomes, recompute ρ) + case-based retrieval into the draft.
+
 ## 6. Guardrails (non-negotiable — physical reservoir)
 - **Advisory only** — the app recommends; **field ops execute**. Never autonomous well/valve control.
 - **Multi-level human approval mandatory** (Analyst → RM → Site).
