@@ -12,7 +12,7 @@
 # databricks-sql-connector — Serving has no Spark).
 #   databricks bundle run job_deploy_vrr_agent -t dev
 # =============================================================================
-# MAGIC %pip install --quiet -U "mlflow>=3.1.3" "databricks-agents>=1.1.0" databricks-sql-connector databricks-sdk
+# MAGIC %pip install --quiet -U "mlflow>=3.1.3" "databricks-agents>=1.2.0" databricks-sql-connector databricks-sdk
 # MAGIC %restart_python
 
 # COMMAND ----------
@@ -89,7 +89,7 @@ with mlflow.start_run(run_name="vrr_reasoning_deploy"):
         code_paths=[VRR_PKG],                    # ship src/vrr_agent alongside
         resources=resources,
         pip_requirements=[
-            "mlflow>=3.1.3", "databricks-agents>=1.1.0", "databricks-sql-connector", "databricks-sdk",
+            "mlflow>=3.1.3", "databricks-agents>=1.2.0", "databricks-sql-connector", "databricks-sdk",
         ],
         registered_model_name=UC_MODEL,
     )
