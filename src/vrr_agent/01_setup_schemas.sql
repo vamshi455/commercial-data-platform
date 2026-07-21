@@ -174,3 +174,50 @@ CREATE TABLE IF NOT EXISTS ${catalog}.vrr_agent.lineage_edge (
   run_id      STRING, built_at TIMESTAMP
 ) USING DELTA
   COMMENT 'Edges of the VRR value-lineage graph; traverse with recursive CTE (vrr_impact / vrr_trace).';
+
+-- ---------------------------------------------------------------------------
+-- Agent MEMORY (design §5.4) — episodic + entity tiers, and safety limits.
+-- The recommendation engine reads these to calibrate + bound proposed valve
+-- changes, and the learning loop writes outcomes back. NOT written by the
+-- serving endpoint (read-mostly); the anomaly/approval jobs do the writes.
+-- ---------------------------------------------------------------------------
+-- EPISODIC memory: one row per proposed/executed adjustment + its outcome.
+CREATE TABLE IF NOT EXISTS ${catalog}.vrr_agent.adjustment_history (
+  action_id        STRING,
+  pattern_id       STRING, pattern_name STRING, vrr_date DATE,
+  driver           STRING,                 -- dominant VRR_DECOMPOSE driver at the time
+  anomaly          STRING,                 -- e.g. 'over-replicating VRR 1.31 vs 1.0'
+  change_type      STRING,                 -- reduce_injection | increase_injection
+  d_inj_res_bbl    DOUBLE,                 -- recommended reservoir-bbl injection change
+  d_surface_pct    DOUBLE,                 -- surface injection %% change applied
+  pre_vrr          DOUBLE,
+  predicted_post_vrr DOUBLE,               -- what the engine predicted
+  actual_post_vrr  DOUBLE,                 -- what happened (fills the learning signal)
+  decision         STRING,                 -- approved | edited | rejected
+  approved_by      STRING, outcome STRING, -- executed | skipped | failed
+  ts               TIMESTAMP
+) USING DELTA
+  COMMENT 'Episodic memory: past VRR anomalies -> recommended change -> decision -> outcome. Feeds precedent retrieval and the per-pattern response-factor learning.';
+
+-- ENTITY memory: one rolling row per pattern (state + LEARNED response factor).
+CREATE TABLE IF NOT EXISTS ${catalog}.vrr_agent.pattern_memory (
+  pattern_id       STRING,
+  pattern_name     STRING,
+  latest_vrr       DOUBLE, latest_date DATE,
+  typical_low      DOUBLE, typical_high DOUBLE,   -- observed normal band
+  response_factor  DOUBLE,                        -- rho = EMA(actual dVRR / predicted dVRR); default 1.0
+  n_adjustments    INT,
+  tendencies       STRING,                        -- free-text/JSON notes (e.g. 'over-responds to injection cuts')
+  updated_at       TIMESTAMP
+) USING DELTA
+  COMMENT 'Entity memory: per-pattern rolling state + LEARNED response factor rho used to calibrate recommendation magnitude.';
+
+-- Safety limits that BOUND any recommended change (RM/Site approval gates).
+CREATE TABLE IF NOT EXISTS ${catalog}.vrr_agent.safety_limits (
+  pattern_id       STRING, completion_id STRING,
+  max_inj_rate_change_pct DOUBLE,   -- e.g. 0.15 = at most 15%% change per action
+  max_inj_pressure DOUBLE,          -- psi
+  fracture_gradient DOUBLE,         -- psi (hard ceiling)
+  note             STRING
+) USING DELTA
+  COMMENT 'Per-pattern/completion safety limits; the recommendation engine clamps proposals to these and escalates if exceeded.';
