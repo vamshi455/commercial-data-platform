@@ -18,13 +18,17 @@ for p in ("databricks-agents", "mlflow"):
     except Exception as e:
         res[p] = f"?({e})"
 
-# Register scorers on the experiment where the endpoint logs its traces (set at
-# deploy time via mlflow.set_experiment in deploy_vrr_agent.py). create_monitor is
-# deprecated for Agent-Framework endpoints; the MLflow 3 scorer API is the path.
-EXPERIMENT = "/Users/vsingam@mhktechinc.com/vrr_agent_traces"
+# Register scorers on the experiment the ENDPOINT actually logs traces to. NOTE:
+# agents.deploy() ties the endpoint's trace store to the DEPLOY NOTEBOOK's experiment
+# (verified stable: /Users/<me>/.bundle/.../deploy_vrr_agent), NOT the active mlflow
+# experiment — so target that id directly. create_monitor is deprecated for
+# Agent-Framework endpoints; the MLflow 3 scorer API is the path.
 import mlflow
 from mlflow.genai.scorers import Safety, Guidelines, ScorerSamplingConfig
-mlflow.set_experiment(EXPERIMENT)
+
+EXPERIMENT_ID = "881736705963498"   # endpoint's trace experiment (deploy_vrr_agent)
+res["endpoint_experiment_id"] = EXPERIMENT_ID
+mlflow.set_experiment(experiment_id=EXPERIMENT_ID)
 
 
 def _reg(scorer, name, rate):
