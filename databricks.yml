@@ -61,12 +61,6 @@ variables:
       a VS endpoint is an always-on billed resource — one per environment that
       needs it. Only dev is provisioned today.
     default: cdp_contracts_vs
-  warehouse_http_path:
-    description: >-
-      SQL warehouse HTTP path the served VRR agent uses to read vrr_curated
-      (Model Serving has no Spark). Per-target below; dev = the cdp_dev warehouse.
-    default: ""
-
 # Resource definitions (jobs + pipelines) live in resources/*.yml and are
 # included here so they can reference ${var.*} and ${bundle.target}.
 include:
@@ -103,7 +97,6 @@ targets:
       landing_volume: /Volumes/cdp_dev/landing/files
       pipeline_channel: PREVIEW
       pipeline_development: "true"
-      warehouse_http_path: /sql/1.0/warehouses/7f0f336bec7b3b0e
 
   # ---- QA: validation, integration tests, UAT. Shared, scheduled paused. ----
   qa:

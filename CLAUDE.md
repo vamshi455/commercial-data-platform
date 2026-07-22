@@ -54,3 +54,12 @@ already ran `mlflow>=3.1.3`/`databricks-agents>=1.2.0` + `setup_vrr_monitoring`)
 | `notebooks/agents/setup_contract_monitoring.py` + `resources/contract_monitoring.job.yml` | Enable Lakehouse Monitoring for GenAI (beta): register Safety (1.0) + grounded-citation Guidelines (0.5) scorers on the endpoint's trace experiment, resolved BY NAME (no hardcoded id) | Peer of `setup_vrr_monitoring.py`/`vrr_monitoring.job.yml` |
 
 Not yet run against dev — re-run `job_deploy_contract_agent` then `job_setup_contract_monitoring`.
+
+### 2026-07-22 — VRR module EXTRACTED to its own repo
+The entire VRR module (all of the 2026-07-19 section above) moved to the private repo
+**`vamshi455/vrr-agent`** (own DAB bundle `vrr-agent`, same dev workspace + `cdp_dev`
+`vrr_raw`/`vrr_curated`/`vrr_agent` schemas, README carries the architecture flow).
+Removed from this repo: `src/vrr_agent/`, `agents/vrr_reasoning/`, the VRR notebooks,
+job YMLs, `docs/vrr_specs/` + coverage CSV, and the `warehouse_http_path` bundle var.
+This repo is back to commercial-data-platform-only concerns. VRR history up to
+`ecfebc9` remains in this repo's git log.
