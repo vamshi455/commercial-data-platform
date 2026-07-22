@@ -2,6 +2,38 @@
 
 Running list of parked/pending threads to pick up. Newest first.
 
+## 📋 Backlog is live on GitHub (2026-07-17)
+
+**The pending threads below are now tracked as GitHub Issues + a project board — that
+board, not this file, is the working queue.** This file stays the narrative record of
+*why*; the issues carry the *what next*.
+
+- **Issues:** https://github.com/vamshi455/commercial-data-platform/issues (**31, consolidated**)
+- **Board:** https://github.com/users/vamshi455/projects/6 (all 31, fields populated)
+- **Re-seed / extend:** `scripts/seed_github_backlog.sh` (idempotent — skips existing titles)
+- **Re-sync board fields from labels:** `scripts/sync_project_fields.sh`
+
+Labels are the source of truth; the board's Priority/Area/Status mirror them.
+Axes: `area:` (added `ml`) · `domain:` · `type:` · `priority:P0–P3` · `status:`.
+Milestones M1–M9 carry the sequencing. Counts: 6×P0, 9×P1, 10×P2, 6×P3.
+
+**Consolidation pass (2026-07-17):** first cut was 51 one-issue-per-table stories; grouped
+"same feature, different table/domain/system" into a single issue with a checklist (MDM field
+enrichment, MES/PLM/WMS, E3/E5/E6 embedding lifecycle, agent-observability spine, MDM
+masters). Added an **M9 Advanced** milestone: ML feature store + real-time scoring (churn/CLV/
+next-best-action) and Reverse-ETL / CDP activation (push segments to Salesforce/Marketo/Ads +
+APIs) — both `area:ml`, correctly late-stage (they sit on the masters + gold layer).
+
+**`status:needs-decision` = your call, not work:** D7 observability scope, keep/delete the idle
+VS endpoint, dashboards audit, authentic bronze names.
+
+**Auth gotcha (cost ~20 min):** `gh auth login` kept reporting success while leaving
+`gh auth status` logged-out — `~/.config` was owned by **root:wheel** (since Dec 2024), so
+the token was fetched then silently dropped on write. Fixed via
+`sudo chown -R vamshi:staff ~/.config`. The GitHub **MCP** server works fine and is authed,
+but it has **no Projects v2 / milestone / label-create tools** — `gh` is the only path for
+board work.
+
 ## ⏳ PENDING
 
 ### Token/LLM cost is unmeasured (2026-07-16)
@@ -161,11 +193,13 @@ manufacturer**. Systems roadmap + what stays/changes/goes in
 ### MDM / Data Catalog / Governance (Standard scope) — added 2026-07-04
 Authoritative masters for customer/product/supplier + survivorship + crosswalk +
 DQ scorecards; add missing source fields to generators/ingestion. Spec:
-[specs/mdm-and-governance.md](specs/mdm-and-governance.md). Backlog (13 issues,
-4 milestones, prioritized) is scripted in `scripts/seed_github_backlog.sh`.
-**BLOCKED on one manual step:** run `gh auth login` (repo scope). Then run the
-seed script (or ask me to) to create the GitHub Issues/Projects backlog. After
-that, async execution = a routine picks the top `status:ready` issue → PR.
+[specs/mdm-and-governance.md](specs/mdm-and-governance.md).
+**✅ UNBLOCKED + SEEDED 2026-07-17** — see "Backlog is live on GitHub" below. The MDM
+issues are #1–#14 (milestones M1–M4). Async execution = a routine picks the top
+`status:ready` issue → PR.
+⚠️ Found while seeding: the spec's **product** master fields are still oil-era
+(`api_gravity`, `sulfur_pct`, BBL/MT) — D8 retired that framing. Reconcile the spec
+against Rheinhardt (Flow/Power/Care/Services) when picking up #2.
 
 ### MCP tools for agents (learning curve) — added 2026-07-04
 Build & maintain agents that access MCP tools, in a sales-enterprise context.
