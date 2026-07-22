@@ -188,16 +188,27 @@ flowchart TD
 ```
 
 ### A. Memory (persist context so it reasons with history) — see also `docs/specs/agent-memory.md`
-Four tiers, all Delta/UC-native:
-| Tier | Store | Used for |
-|---|---|---|
-| **Working / conversation** | `vrr_agent.session_memory(session_id, ts, role, content, pattern_context)` | continuity within/across a user's sessions |
-| **Episodic (long-term)** | `vrr_agent.adjustment_history` (anomaly → decision → outcome) | "what happened last time on this pattern" |
-| **Semantic** | `reservoir_knowledge` vector index (engineer PDFs, Slice C) | constraints, well behavior, heuristics |
-| **Entity** | `vrr_agent.pattern_memory(pattern_id, latest_state, tendencies, response_factor, recent_anomalies)` | per-pattern rolling summary + learned gain |
+Four tiers. **Design decision (2026-07-21): source what you can from MLflow traces; only
+materialize what traces structurally cannot hold.** A trace records what the *agent did*
+(request/response/tool spans); the learning tables record real-world *decisions + outcomes*
+(approved? executed at the field? did VRR actually move days later?) — none of which is in a trace.
+
+| Tier | Store | From traces? | Used for |
+|---|---|---|---|
+| **Working / conversation** | **MLflow traces** (session/user IDs) — *no dedicated table* | ✅ yes | continuity within/across a user's sessions |
+| **Episodic (long-term)** | `vrr_agent.adjustment_history` (anomaly → decision → outcome) | ❌ no — outcome arrives later, human-entered | "what happened last time on this pattern" |
+| **Semantic** | `reservoir_knowledge` vector index (engineer PDFs, Slice C) | ❌ no — external knowledge | constraints, well behavior, heuristics |
+| **Entity** | `vrr_agent.pattern_memory(pattern_id, latest_state, tendencies, response_factor, recent_anomalies)` | ❌ no — materialized learned ρ | per-pattern rolling summary + learned gain |
+
+Rationale for keeping episodic + entity as governed tables (not derived from traces): the
+recommendation engine needs **structured, queryable** inputs (pre/post VRR, ρ, safety limits);
+they're written by the **approval/outcome jobs**, not the chat endpoint; the ρ-learning loop and
+precedent retrieval require **reliable joins/aggregations**; and traces are **sampled/retention-
+limited** and tied to the endpoint experiment — not a system-of-record. Conversation memory has
+none of these needs, so it rides on traces and we **drop the planned `session_memory` table**.
 
 At reason-time for pattern P, the agent retrieves `pattern_memory(P)` + recent `adjustment_history(P)`
-+ semantic hits + session history → grounds every recommendation in precedent, not just the current number.
++ semantic hits + trace-derived session history → grounds every recommendation in precedent, not just the current number.
 
 ### B. Monitor → Act (autonomy)
 `job_vrr_anomaly` (scheduled, runs after the refresh) detects anomalies (out-of-band VRR, sustained
