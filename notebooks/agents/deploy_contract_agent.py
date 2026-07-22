@@ -13,7 +13,7 @@
 # cost is the Vector Search endpoint.
 #   databricks bundle run job_deploy_contract_agent -t dev
 # =============================================================================
-# MAGIC %pip install --quiet -U mlflow databricks-agents databricks-vectorsearch databricks-sdk
+# MAGIC %pip install --quiet -U "mlflow>=3.1.3" "databricks-agents>=1.2.0" databricks-vectorsearch databricks-sdk
 # MAGIC %restart_python
 
 # COMMAND ----------
@@ -41,6 +41,16 @@ print("model file:", MODEL_FILE, "\nUC model:", UC_MODEL, "\nindex:", INDEX)
 # ---- log the agent (from code) + register to Unity Catalog -------------------
 mlflow.set_registry_uri("databricks-uc")
 
+# MLflow 3 real-time tracing: agents.deploy() links the endpoint's trace store to the
+# experiment the MODEL is logged under, so set a dedicated NON-Git experiment HERE
+# (before log_model). Traces silently don't stream if the active experiment is a
+# Git-folder notebook. The @mlflow.trace spans in model.py then show live per request,
+# and setup_contract_monitoring.py registers production scorers on this same experiment.
+_user = spark.sql("SELECT current_user()").collect()[0][0]                # noqa: F821
+TRACE_EXPERIMENT = f"/Users/{_user}/contract_agent_traces"
+mlflow.set_experiment(TRACE_EXPERIMENT)
+print("real-time tracing experiment:", TRACE_EXPERIMENT)
+
 resources = [
     DatabricksVectorSearchIndex(index_name=INDEX),
     DatabricksServingEndpoint(endpoint_name=GEN_MODEL),
@@ -57,7 +67,7 @@ with mlflow.start_run(run_name="contract_intelligence_deploy"):
         input_example=input_example,
         registered_model_name=UC_MODEL,
         pip_requirements=[
-            "mlflow", "databricks-agents", "databricks-vectorsearch", "databricks-sdk",
+            "mlflow>=3.1.3", "databricks-agents>=1.2.0", "databricks-vectorsearch", "databricks-sdk",
         ],
     )
 print("registered:", logged.registered_model_version, "uri:", logged.model_uri)

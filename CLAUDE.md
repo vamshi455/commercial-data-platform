@@ -43,3 +43,14 @@ so it never mixes with the commercial bronze/silver/gold. Nothing existing was m
 Deployed live to dev: UC model + scale-to-zero serving endpoint `agents_cdp_dev-vrr_agent-vrr_reasoning`.
 Email/SMTP report-delivery direction was explored then **dropped**; instead added discovery tools
 so the agent answers open-ended questions. Not yet built: a feedback loop (Review App + agent eval).
+
+### 2026-07-22 — MLflow 3 real-time tracing + GenAI monitoring for the contract agent
+Brought `contract_intelligence` up to the VRR agent's MLflow-3 standard (the VRR path
+already ran `mlflow>=3.1.3`/`databricks-agents>=1.2.0` + `setup_vrr_monitoring`).
+
+| Module / artifact | Purpose | Fits into landscape |
+|---|---|---|
+| `notebooks/agents/deploy_contract_agent.py` | Pin `mlflow>=3.1.3`/`databricks-agents>=1.2.0` (was unpinned) + set a dedicated NON-Git trace experiment (`/Users/<me>/contract_agent_traces`) before `log_model` so `@mlflow.trace` spans stream live per request | Mirrors `deploy_vrr_agent.py` |
+| `notebooks/agents/setup_contract_monitoring.py` + `resources/contract_monitoring.job.yml` | Enable Lakehouse Monitoring for GenAI (beta): register Safety (1.0) + grounded-citation Guidelines (0.5) scorers on the endpoint's trace experiment, resolved BY NAME (no hardcoded id) | Peer of `setup_vrr_monitoring.py`/`vrr_monitoring.job.yml` |
+
+Not yet run against dev — re-run `job_deploy_contract_agent` then `job_setup_contract_monitoring`.

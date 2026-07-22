@@ -1,0 +1,17 @@
+# One-off job to enable/test Lakehouse Monitoring for GenAI on the contract agent endpoint.
+#   databricks bundle run job_setup_contract_monitoring -t dev
+resources:
+  jobs:
+    job_setup_contract_monitoring:
+      name: "[${bundle.target}] job_setup_contract_monitoring"
+      description: Enable MLflow 3 production monitoring (safety + grounded-citation) on the contract_intelligence agent endpoint.
+      tags:
+        platform: commercial-data-platform
+        environment: ${bundle.target}
+        domain: contracts
+      tasks:
+        - task_key: setup_monitoring
+          notebook_task:
+            notebook_path: ../notebooks/agents/setup_contract_monitoring.py
+      queue:
+        enabled: true
